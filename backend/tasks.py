@@ -1,0 +1,262 @@
+from db import SessionLocal
+import uuid
+from logger import setup_logger
+from models import Job, Transaction, CategoryStatus
+from services.llm import extract_transactions, categorize_transactions
+from services.pdf import extract_markdown
+
+logger = setup_logger("worker")
+
+
+# -----------------------------
+# Generate Transaction ID (UUID)
+# -----------------------------
+def generate_transaction_id():
+    return str(uuid.uuid4())
+
+
+# -----------------------------
+# Save Transactions
+# -----------------------------
+def save_transactions(session, job_id, transactions):
+    for t in transactions:
+        txn = Transaction(
+            id=generate_transaction_id(),
+            job_id=job_id,
+            date=t["date"],
+            description=t["description"],
+            amount=t["amount"],
+            category=None,
+        )
+        session.add(txn)
+
+
+# -----------------------------
+# Update Categories
+# -----------------------------
+def update_categories(session, job_id, categorized):
+    # STEP 1: mark successful ones — match by id (exact, unambiguous)
+    for t in categorized:
+        txn_id = t.get("id")
+        category = t.get("category")
+
+        if not txn_id or not category:
+            logger.warning(f"[DB] Skipping categorized entry with missing fields: {t}")
+            continue
+
+        updated = (
+            session.query(Transaction)
+            .filter(
+                Transaction.id == txn_id,
+                Transaction.job_id == job_id,
+                Transaction.category_status.in_(
+                    [CategoryStatus.pending, CategoryStatus.failed]
+                ),
+            )
+            .update(
+                {
+                    "category": category,
+                    "category_status": CategoryStatus.done,
+                },
+                synchronize_session=False,
+            )
+        )
+
+        if updated == 0:
+            logger.warning(f"[DB] No matching transaction found for id={txn_id!r}")
+
+    # STEP 2: mark remaining as failed
+    session.query(Transaction).filter(
+        Transaction.job_id == job_id,
+        Transaction.category_status == CategoryStatus.pending,
+    ).update(
+        {"category_status": CategoryStatus.failed},
+        synchronize_session=False,
+    )
+
+
+# -----------------------------
+# Update Job Status
+# -----------------------------
+def update_job_status(session, job_id, status):
+    session.query(Job).filter(Job.job_id == job_id).update(
+        {"status": status},
+        synchronize_session=False,
+    )
+
+
+# -----------------------------
+# Main Worker Task
+# -----------------------------
+def process_pdf(file_path: str, job_id: str):
+    logger.info(f"[Worker] Start processing {file_path}")
+    session = SessionLocal()
+
+    try:
+        # ✅ STEP 0: mark extracting
+        update_job_status(session, job_id, "extracting")
+        session.commit()
+
+        # STEP 1: PDF → Markdown
+        markdown = extract_markdown(file_path)
+
+        # STEP 2: Extract Transactions
+        transactions = extract_transactions(markdown)
+
+        # ❌ only true failure
+        if transactions is None:
+            update_job_status(session, job_id, "extract_failed")
+            session.commit()
+            return
+
+        # STEP 3: Save Transactions
+        save_transactions(session, job_id, transactions)
+
+        # ✅ move to categorizing stage
+        update_job_status(session, job_id, "categorizing")
+        session.commit()  # partial commit
+
+        # Fetch saved rows so we have real DB IDs
+        saved_rows = (
+            session.query(Transaction).filter(Transaction.job_id == job_id).all()
+        )
+
+        transactions_for_llm = [
+            {
+                "id": str(t.id),
+                "date": str(t.date),
+                "description": t.description,
+                "amount": t.amount,
+            }
+            for t in saved_rows
+        ]
+
+        # STEP 4: Categorize
+        categorized = categorize_transactions(transactions_for_llm)
+
+        # ❌ only true failure
+        if categorized is None:
+            update_job_status(session, job_id, "categorize_failed")
+            session.commit()
+            return
+
+        # STEP 5: Update Categories
+        update_categories(session, job_id, categorized)
+
+        # STEP 6: Check if any failed remain
+        remaining_failed = (
+            session.query(Transaction)
+            .filter(
+                Transaction.job_id == job_id,
+                Transaction.category_status == CategoryStatus.failed,
+            )
+            .first()
+        )
+
+        if remaining_failed:
+            update_job_status(session, job_id, "categorize_failed")
+        else:
+            update_job_status(session, job_id, "completed")
+
+        session.commit()
+
+        logger.info(f"[Worker] Completed {job_id}")
+
+    except Exception as e:
+        logger.error(f"[Worker] Failed: {e}")
+        session.rollback()
+
+        # fresh session for failure update
+        fail_session = SessionLocal()
+        try:
+            update_job_status(fail_session, job_id, "failed")
+            fail_session.commit()
+        finally:
+            fail_session.close()
+
+    finally:
+        session.close()
+
+
+# -----------------------------
+# Retry Categorization
+# -----------------------------
+def retry_categorization(job_id: str):
+    logger.info(f"[Worker] Retry categorization for {job_id}")
+    session = SessionLocal()
+
+    try:
+        # STEP 1: fetch pending + failed
+        rows = (
+            session.query(Transaction)
+            .filter(
+                Transaction.job_id == job_id,
+                Transaction.category_status.in_(
+                    [CategoryStatus.pending, CategoryStatus.failed]
+                ),
+            )
+            .all()
+        )
+
+        if not rows:
+            update_job_status(session, job_id, "completed")
+            session.commit()
+            return
+
+        # STEP 2: mark categorizing
+        update_job_status(session, job_id, "categorizing")
+        session.commit()
+
+        transactions = [
+            {
+                "id": str(t.id),
+                "date": str(t.date),
+                "description": t.description,
+                "amount": t.amount,
+            }
+            for t in rows
+        ]
+
+        # STEP 3: categorize
+        categorized = categorize_transactions(transactions)
+
+        if categorized is None:
+            update_job_status(session, job_id, "categorize_failed")
+            session.commit()
+            return
+
+        # STEP 4: update categories FIRST
+        update_categories(session, job_id, categorized)
+
+        # STEP 5: check remaining failures
+        remaining_failed = (
+            session.query(Transaction)
+            .filter(
+                Transaction.job_id == job_id,
+                Transaction.category_status == CategoryStatus.failed,
+            )
+            .first()
+        )
+
+        if remaining_failed:
+            update_job_status(session, job_id, "categorize_failed")
+        else:
+            update_job_status(session, job_id, "completed")
+
+        session.commit()
+
+        logger.info(f"[Worker] Retry completed for {job_id}")
+
+    except Exception as e:
+        logger.error(f"[Worker] Retry failed for {job_id}: {e}")
+        session.rollback()
+
+        fail_session = SessionLocal()
+        try:
+            update_job_status(fail_session, job_id, "failed")
+            fail_session.commit()
+        finally:
+            fail_session.close()
+
+    finally:
+        session.close()
