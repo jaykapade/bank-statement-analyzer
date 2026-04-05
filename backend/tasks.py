@@ -4,6 +4,9 @@ from logger import setup_logger
 from models import Job, Transaction, CategoryStatus
 from services.llm import extract_transactions, categorize_transactions
 from services.pdf import extract_markdown
+import tempfile
+import os
+from storage import s3, BUCKET_NAME
 
 logger = setup_logger("worker")
 
@@ -88,11 +91,18 @@ def update_job_status(session, job_id, status):
 # -----------------------------
 # Main Worker Task
 # -----------------------------
-def process_pdf(file_path: str, job_id: str):
-    logger.info(f"[Worker] Start processing {file_path}")
+def process_pdf(object_key: str, job_id: str):
+    logger.info(f"[Worker] Start processing {object_key}")
     session = SessionLocal()
 
+    temp_dir = tempfile.mkdtemp()
+    file_path = os.path.join(temp_dir, os.path.basename(object_key))
+
     try:
+        logger.info(f"[Worker] Downloading {object_key} to {file_path}")
+        s3.download_file(BUCKET_NAME, object_key, file_path)
+        logger.info(f"[Worker] Downloaded {object_key} to {file_path}")
+
         # ✅ STEP 0: mark extracting
         update_job_status(session, job_id, "extracting")
         session.commit()
@@ -175,6 +185,12 @@ def process_pdf(file_path: str, job_id: str):
             fail_session.close()
 
     finally:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        try:
+            os.rmdir(temp_dir)
+        except OSError:
+            pass
         session.close()
 
 

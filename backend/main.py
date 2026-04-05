@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from models import CategoryStatus
 from fastapi.responses import JSONResponse
 import sys
@@ -19,6 +20,7 @@ if sys.platform == "win32":
 from fastapi import FastAPI, UploadFile, File, Request, HTTPException
 import os
 import uuid
+from storage import s3, BUCKET_NAME, init_bucket
 
 from redis import Redis
 from rq import Queue
@@ -28,11 +30,20 @@ from models import Job, Transaction, JobStatus
 from tasks import process_pdf, retry_categorization
 from logger import logger
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        init_bucket()
+        logger.info("S3 bucket initialized")
+    except Exception as e:
+        logger.error(f"Failed to initialize S3 bucket: {e}", exc_info=True)
+        raise  # fail fast — don't start the app without storage
+    yield
 
 
-UPLOAD_DIR = "uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+app = FastAPI(lifespan=lifespan)
+
 
 # Redis connection
 redis_host = os.getenv("REDIS_HOST", "localhost")
@@ -68,16 +79,23 @@ def healthy():
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     job_id = str(uuid.uuid4())
-    file_path = os.path.join(UPLOAD_DIR, file.filename)
+    object_key = f"{job_id}/{file.filename}"
 
-    with open(file_path, "wb") as f:
-        f.write(await file.read())
+    logger.info(f"Uploading {file.filename} to S3")
+    file_bytes = await file.read()
+    s3.put_object(Bucket=BUCKET_NAME, Key=object_key, Body=file_bytes)
+    logger.info(f"Uploaded {file.filename} to S3: {object_key}")
 
     # Create the job record so it's immediately visible to /jobs/{job_id}
     session = SessionLocal()
     try:
         session.add(
-            Job(job_id=job_id, status=JobStatus.pending, filename=file.filename)
+            Job(
+                job_id=job_id,
+                status=JobStatus.pending,
+                filename=file.filename,
+                s3_url=object_key,
+            )
         )
         session.commit()
     except Exception as e:
@@ -89,7 +107,7 @@ async def upload_file(file: UploadFile = File(...)):
 
     try:
         # try sending job to Redis
-        queue.enqueue(process_pdf, file_path, job_id)
+        queue.enqueue(process_pdf, object_key, job_id)
 
     except Exception as e:
         logger.error(f"Redis/RQ enqueue failed for job {job_id}: {e}", exc_info=True)
@@ -249,7 +267,7 @@ def retry_job(job_id: str):
     return {"message": "Retry started", "job_id": job_id}
 
 
-@app.get("/reset")
+@app.post("/reset")
 def reset():
     session = SessionLocal()
     try:

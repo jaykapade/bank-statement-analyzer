@@ -37,6 +37,7 @@ class Job(Base):
     job_id = Column(String, primary_key=True)
     filename = Column(String)
     status = Column(Enum(JobStatus), default=JobStatus.pending)
+    s3_url = Column(String)
 
 
 # -----------------------------
