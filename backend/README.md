@@ -64,4 +64,7 @@ Ensure you have a Redis server running locally or via Docker and Ollama accessib
 - [ ] **Docker Setup:** Update and verify the `Dockerfile` and `docker-compose.yml` to properly orchestrate the API, RQ worker, Redis, Database, and MinIO with optimal configurations.
 - [ ] **Configuration Management:** Implement structured application settings using `pydantic-settings` to securely and cleanly load sensitive credentials, database paths, and API endpoints from Environment Variables rather than hardcoding.
 - [ ] **Proper Database for Production:** Switch out SQLite for PostgreSQL or MySQL when moving to a production environment.
+- [ ] **User Authentication API:** Setup JWT-based authentication endpoints (registration/log in) and secure existing routes.
+- [ ] **Dashboard API Endpoints:** Create robust endpoints to serve summarized reporting data, paginated transactions, and analytical metrics to the frontend.
+- [ ] **Error Handling & Validation:** Improve input validation and standard error responses across all API endpoints.
 - [ ] **Unit and Integration Tests:** Set up `pytest` to validate core endpoints and background job execution.
