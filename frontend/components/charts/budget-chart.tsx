@@ -1,5 +1,6 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
 type BudgetSlice = {
@@ -9,6 +10,12 @@ type BudgetSlice = {
 };
 
 export function BudgetChart({ data }: { data: BudgetSlice[] }) {
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+
   function formatValue(
     value: number | string | ReadonlyArray<number | string> | undefined,
     name: string | number | undefined,
@@ -19,6 +26,10 @@ export function BudgetChart({ data }: { data: BudgetSlice[] }) {
 
   return (
     <div className="h-[340px] w-full">
+      {!mounted ? (
+        <div className="h-[340px] w-full rounded-[1.5rem] border border-white/6 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))]" />
+      ) : null}
+      {mounted ? (
       <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={340}>
         <PieChart>
           <Pie
@@ -48,6 +59,7 @@ export function BudgetChart({ data }: { data: BudgetSlice[] }) {
           />
         </PieChart>
       </ResponsiveContainer>
+      ) : null}
     </div>
   );
 }

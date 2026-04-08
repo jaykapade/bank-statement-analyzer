@@ -8,7 +8,7 @@ The frontend serves as the user interface for the finance tracking system. It al
 
 ## Implementation Plan & Roadmap
 
-The following features are planned for future implementation. **Note: These are currently planned and not yet implemented.**
+The following features are planned for future implementation.
 
 ### 1. Authentication
 - [ ] **User Registration & Login:** Secure sign-up and login flow.
@@ -16,14 +16,14 @@ The following features are planned for future implementation. **Note: These are 
 - [ ] **Protected Routes:** Ensuring that only authenticated users can access their financial dashboards and upload data.
 
 ### 2. Data Upload & Processing
-- [ ] **Drag & Drop Interface:** An intuitive file upload zone for PDFs and CSV bank statements.
-- [ ] **Upload Progress & Status:** Real-time feedback during file upload and background processing (integrating with the backend task queue).
-- [ ] **Error Handling:** Clear notifications for unsupported file types or parsing failures.
+- [x] **Drag & Drop Interface:** An intuitive file upload zone for PDFs and CSV bank statements.
+- [x] **Upload Progress & Status:** Real-time feedback during file upload and background processing (integrating with the backend task queue).
+- [x] **Error Handling:** Clear notifications for unsupported file types or parsing failures.
 
 ### 3. Dashboard & Data Visualization
-- [ ] **Summary Overview:** Key metrics like total income, total expenses, and net savings for the selected period.
-- [ ] **Transaction Table:** A comprehensive view of all transactions with sorting, filtering, and pagination.
-- [ ] **Interactive Charts:** Visualizing spending by category, income vs. expenses, and historical trends.
+- [x] **Summary Overview:** Key metrics like total income, total expenses, and net savings for the selected period.
+- [x] **Transaction Table:** A comprehensive view of all transactions with sorting, filtering, and pagination.
+- [x] **Interactive Charts:** Visualizing spending by category, income vs. expenses, and historical trends.
 - [ ] **Manual Adjustments:** Allowing users to manually correct AI-categorized transactions.
 
 ### 4. Dockerization
@@ -31,10 +31,8 @@ The following features are planned for future implementation. **Note: These are 
 - [ ] **Docker Compose Integration:** Ensuring seamless integration with the existing backend and worker containers for easy local development and deployment.
 
 ### 5. UI/UX Enhancements
-- [ ] **Modern Aesthetics:** Implementing a clean, responsive design using a utility-first CSS framework or specialized UI components.
-- [ ] **Dark Mode Support:** A toggleable dark/light theme for user comfort.
-- [ ] **State Management:** Efficient data fetching and caching for a snappy user experience.
-- [ ] **Notifications System:** Toast notifications to keep the user informed about background tasks and system alerts.
+- [x] **Modern Aesthetics:** Implementing a clean, responsive design using a utility-first CSS framework or specialized UI components.
+- [x] **Notifications System:** Toast notifications to keep the user informed about system alerts and errors.
 
 ---
 
@@ -55,4 +53,3 @@ bun dev
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
