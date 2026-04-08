@@ -1,5 +1,6 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import {
   Area,
   AreaChart,
@@ -17,16 +18,27 @@ type CashflowPoint = {
 };
 
 export function SpendingChart({ data }: { data: CashflowPoint[] }) {
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+
   function formatValue(
     value: number | string | ReadonlyArray<number | string> | undefined,
+    name: string | number | undefined,
   ): [string, string] {
     const amount = typeof value === "number" ? value : Number(value ?? 0);
-    return [amount.toLocaleString(), ""];
+    return [amount.toLocaleString(), name === "income" ? "Income" : "Expenses"];
   }
 
   return (
-    <div className="h-[360px] w-full">
-      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={360}>
+    <div className="h-full min-h-[420px] w-full">
+      {!mounted ? (
+        <div className="h-full min-h-[420px] w-full rounded-[1.5rem] border border-white/6 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))]" />
+      ) : null}
+      {mounted ? (
+      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={420}>
         <AreaChart data={data} margin={{ top: 12, right: 8, left: -16, bottom: 0 }}>
           <defs>
             <linearGradient id="incomeFill" x1="0" y1="0" x2="0" y2="1">
@@ -34,8 +46,8 @@ export function SpendingChart({ data }: { data: CashflowPoint[] }) {
               <stop offset="100%" stopColor="var(--color-emerald)" stopOpacity={0.02} />
             </linearGradient>
             <linearGradient id="expenseFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--color-cyan)" stopOpacity={0.32} />
-              <stop offset="100%" stopColor="var(--color-cyan)" stopOpacity={0.02} />
+              <stop offset="0%" stopColor="var(--color-rose)" stopOpacity={0.3} />
+              <stop offset="100%" stopColor="var(--color-rose)" stopOpacity={0.02} />
             </linearGradient>
           </defs>
           <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
@@ -73,12 +85,13 @@ export function SpendingChart({ data }: { data: CashflowPoint[] }) {
           <Area
             dataKey="expenses"
             fill="url(#expenseFill)"
-            stroke="var(--color-cyan)"
+            stroke="var(--color-rose)"
             strokeWidth={3}
             type="monotone"
           />
         </AreaChart>
       </ResponsiveContainer>
+      ) : null}
     </div>
   );
 }

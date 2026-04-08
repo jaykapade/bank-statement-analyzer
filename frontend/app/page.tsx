@@ -1,11 +1,6 @@
 import Link from "next/link";
 import { ErrorToast } from "@/components/error-toast";
-import {
-  ReceiptText,
-  TrendingDown,
-  TrendingUp,
-  Wallet,
-} from "lucide-react";
+import { ReceiptText, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { BudgetChart } from "@/components/charts/budget-chart";
 import { SpendingChart } from "@/components/charts/spending-chart";
 import {
@@ -23,9 +18,10 @@ type TrendPoint = {
 };
 
 function formatCurrency(value: number) {
-  return new Intl.NumberFormat("en-US", {
+  const formatted = new Intl.NumberFormat("en-US", {
     maximumFractionDigits: 0,
   }).format(value);
+  return formatted;
 }
 
 function parseDateValue(value: string) {
@@ -97,7 +93,8 @@ function buildBudgetData(transactions: Transaction[]) {
   const outgoing = transactions.filter(
     (transaction) => transaction.category && transaction.amount < 0,
   );
-  const source = outgoing.length > 0 ? outgoing : transactions.filter((t) => t.category);
+  const source =
+    outgoing.length > 0 ? outgoing : transactions.filter((t) => t.category);
   const totals = new Map<string, number>();
   const palette = ["#818cf8", "#34d399", "#38bdf8", "#fbbf24", "#fb7185"];
 
@@ -261,24 +258,21 @@ export default async function Home() {
       value: formatCurrency(netFlow),
       detail: `${transactions.length} transactions`,
       icon: Wallet,
-      tone:
-        "from-cyan-400/24 via-cyan-300/10 to-transparent text-cyan-100 ring-cyan-400/20",
+      tone: "from-cyan-400/24 via-cyan-300/10 to-transparent text-cyan-100 ring-cyan-400/20",
     },
     {
       label: "Money out",
       value: formatCurrency(totalExpenses),
       detail: `${uncategorizedCount} uncategorized`,
       icon: TrendingDown,
-      tone:
-        "from-rose-400/24 via-rose-300/10 to-transparent text-rose-100 ring-rose-400/20",
+      tone: "from-rose-400/24 via-rose-300/10 to-transparent text-rose-100 ring-rose-400/20",
     },
     {
       label: "Money in",
       value: formatCurrency(totalIncome),
       detail: `${completedJobs} completed jobs`,
       icon: TrendingUp,
-      tone:
-        "from-emerald-400/24 via-emerald-300/10 to-transparent text-emerald-100 ring-emerald-400/20",
+      tone: "from-emerald-400/24 via-emerald-300/10 to-transparent text-emerald-100 ring-emerald-400/20",
     },
   ];
 
@@ -332,9 +326,9 @@ export default async function Home() {
         })}
       </section>
 
-      <section className="grid gap-6 2xl:grid-cols-[1.45fr_0.95fr]">
-        <article className="dashboard-surface rounded-[2rem] p-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <section className="grid gap-6 2xl:grid-cols-[2fr_1fr]">
+        <article className="dashboard-surface flex min-h-[640px] flex-col rounded-[2rem] p-6">
+          <div className="flex flex-col gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.24em] text-[var(--color-mist-strong)]">
                 Trend
@@ -343,13 +337,29 @@ export default async function Home() {
                 Income vs. expenses
               </h2>
             </div>
-            <div className="flex flex-wrap gap-2 text-sm">
-              <span className="pill">Income</span>
-              <span className="pill">Expenses</span>
-            </div>
           </div>
-          <div className="mt-6">
+          <div className="mt-6 flex-1">
             <SpendingChart data={trendData} />
+          </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <div className="flex items-center justify-between rounded-[1.1rem] border border-white/8 bg-white/3 px-4 py-3">
+              <div className="flex items-center gap-3">
+                <span className="h-3 w-3 rounded-full bg-emerald-400 shadow-[0_0_18px_rgba(52,211,153,0.4)]" />
+                <span className="text-sm text-white">Income</span>
+              </div>
+              <span className="font-mono text-sm text-emerald-300">
+                {formatCurrency(totalIncome)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between rounded-[1.1rem] border border-white/8 bg-white/3 px-4 py-3">
+              <div className="flex items-center gap-3">
+                <span className="h-3 w-3 rounded-full bg-rose-400 shadow-[0_0_18px_rgba(251,113,133,0.35)]" />
+                <span className="text-sm text-white">Expenses</span>
+              </div>
+              <span className="font-mono text-sm text-rose-300">
+                {formatCurrency(totalExpenses)}
+              </span>
+            </div>
           </div>
         </article>
 
@@ -389,7 +399,8 @@ export default async function Home() {
             </>
           ) : (
             <div className="mt-6 rounded-[1.25rem] border border-white/8 bg-white/4 px-4 py-6 text-sm text-[var(--color-mist)]">
-              Categories will appear after extraction returns categorized transactions.
+              Categories will appear after extraction returns categorized
+              transactions.
             </div>
           )}
         </article>
@@ -415,14 +426,18 @@ export default async function Home() {
                 className="flex items-center justify-between gap-4 rounded-[1.25rem] border border-white/8 bg-white/4 px-4 py-4"
               >
                 <div className="min-w-0">
-                  <p className="truncate font-medium text-white">{item.description}</p>
+                  <p className="truncate font-medium text-white">
+                    {item.description}
+                  </p>
                   <p className="mt-1 text-sm text-[var(--color-mist)]">
                     {item.category ?? "Uncategorized"} | {item.date}
                   </p>
                 </div>
                 <span
-                  className={`shrink-0 font-mono text-base font-semibold ${
-                    item.amount >= 0 ? "text-emerald-400" : "text-red-400"
+                  className={`shrink-0 rounded-full px-3 py-1 font-mono text-sm font-semibold ring-1 ${
+                    item.amount >= 0
+                      ? "bg-emerald-400/14 text-emerald-300 ring-emerald-400/20"
+                      : "bg-red-400/14 text-red-300 ring-red-400/20"
                   }`}
                 >
                   {formatCurrency(item.amount)}

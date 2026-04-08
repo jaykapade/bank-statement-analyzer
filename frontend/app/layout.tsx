@@ -16,7 +16,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full antialiased">
-      <body className="min-h-full bg-[var(--color-ink)] text-[var(--color-paper)]">
+      <body
+        suppressHydrationWarning
+        className="min-h-full bg-[var(--color-ink)] text-[var(--color-paper)]"
+      >
         <Toaster
           closeButton
           expand={false}

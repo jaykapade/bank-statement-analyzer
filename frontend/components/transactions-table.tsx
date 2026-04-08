@@ -1,10 +1,11 @@
 import type { Transaction } from "@/lib/api";
 
 function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("en-US", {
+  const formatted = new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount);
+  return amount > 0 ? `+${formatted}` : formatted;
 }
 
 export function TransactionsTable({
@@ -53,11 +54,17 @@ export function TransactionsTable({
                   {transaction.category || "Uncategorized"}
                 </td>
                 <td
-                  className={`px-4 py-4 text-right font-mono text-sm font-semibold ${
-                    transaction.amount >= 0 ? "text-emerald-400" : "text-red-400"
-                  }`}
+                  className="px-4 py-4 text-right"
                 >
-                  {formatCurrency(transaction.amount)}
+                  <span
+                    className={`inline-flex rounded-full px-3 py-1 font-mono text-sm font-semibold ${
+                      transaction.amount >= 0
+                        ? "bg-emerald-400/14 text-emerald-300 ring-1 ring-emerald-400/20"
+                        : "bg-red-400/14 text-red-300 ring-1 ring-red-400/20"
+                    }`}
+                  >
+                    {formatCurrency(transaction.amount)}
+                  </span>
                 </td>
               </tr>
             ))}
