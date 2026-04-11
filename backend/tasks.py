@@ -7,7 +7,8 @@ from services.rules import rules_categorize
 from services.pdf import extract_markdown
 import tempfile
 import os
-from storage import s3, BUCKET_NAME, get_markdown_object_key
+from storage import s3, get_markdown_object_key
+from config import settings
 
 logger = setup_logger("worker")
 
@@ -105,7 +106,7 @@ def process_pdf(object_key: str, job_id: str):
 
     try:
         logger.info(f"[Worker] Downloading {object_key} to {file_path}")
-        s3.download_file(BUCKET_NAME, object_key, file_path)
+        s3.download_file(settings.bucket_name, object_key, file_path)
         logger.info(f"[Worker] Downloaded {object_key} to {file_path}")
 
         # ✅ STEP 0: mark extracting
@@ -116,12 +117,14 @@ def process_pdf(object_key: str, job_id: str):
         markdown = extract_markdown(file_path)
         markdown_object_key = get_markdown_object_key(object_key)
         s3.put_object(
-            Bucket=BUCKET_NAME,
+            Bucket=settings.bucket_name,
             Key=markdown_object_key,
             Body=markdown.encode("utf-8"),
             ContentType="text/markdown; charset=utf-8",
         )
-        logger.info(f"[Worker] Uploaded markdown debug artifact to {markdown_object_key}")
+        logger.info(
+            f"[Worker] Uploaded markdown debug artifact to {markdown_object_key}"
+        )
 
         # STEP 2: Extract Transactions (LLM)
         transactions = extract_transactions(markdown)
@@ -156,7 +159,9 @@ def process_pdf(object_key: str, job_id: str):
 
         # STEP 4a: Rules-based pre-categorization (fast, deterministic)
         rule_matched, llm_needed = rules_categorize(transactions_for_categorization)
-        rule_results = [{"id": t["id"], "category": t["category"]} for t in rule_matched]
+        rule_results = [
+            {"id": t["id"], "category": t["category"]} for t in rule_matched
+        ]
 
         # STEP 4b: LLM categorization for remaining transactions
         categorized = categorize_transactions(llm_needed)
@@ -167,7 +172,9 @@ def process_pdf(object_key: str, job_id: str):
                 update_job_status(session, job_id, "categorize_failed")
                 session.commit()
                 return
-            logger.warning("[Worker] LLM categorization failed; applying rule results only")
+            logger.warning(
+                "[Worker] LLM categorization failed; applying rule results only"
+            )
             categorized = []
 
         # STEP 5: Update Categories (merge rule results + LLM results)
@@ -255,7 +262,9 @@ def retry_categorization(job_id: str):
 
         # STEP 3a: Rules-based pre-categorization
         rule_matched, llm_needed = rules_categorize(transactions)
-        rule_results = [{"id": t["id"], "category": t["category"]} for t in rule_matched]
+        rule_results = [
+            {"id": t["id"], "category": t["category"]} for t in rule_matched
+        ]
 
         # STEP 3b: LLM for remaining
         categorized = categorize_transactions(llm_needed)
@@ -265,7 +274,9 @@ def retry_categorization(job_id: str):
                 update_job_status(session, job_id, "categorize_failed")
                 session.commit()
                 return
-            logger.warning("[Worker] LLM categorization failed; applying rule results only")
+            logger.warning(
+                "[Worker] LLM categorization failed; applying rule results only"
+            )
             categorized = []
 
         # STEP 4: Update categories (merge rule results + LLM results)
