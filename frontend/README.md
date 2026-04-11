@@ -1,55 +1,86 @@
-# Bank Statement Analyzer - Frontend
+# Bank Statement Analyzer — Frontend
 
-This is the frontend application for the Bank Statement Analyzer project, built with [Next.js](https://nextjs.org).
+Next.js 16 frontend for the Bank Statement Analyzer. Provides authentication, PDF upload, job tracking, transaction display, and financial dashboards.
 
-## Project Overview
+## Tech Stack
 
-The frontend serves as the user interface for the finance tracking system. It allows users to securely log in, upload their bank statements, view automated categorizations, and visualize their financial data through interactive dashboards.
-
-## Implementation Plan & Roadmap
-
-The following features are planned for future implementation.
-
-### 1. Authentication
-- [ ] **User Registration & Login:** Secure sign-up and login flow.
-- [ ] **Session Management:** Handling JWT tokens securely (e.g., HTTP-only cookies).
-- [ ] **Protected Routes:** Ensuring that only authenticated users can access their financial dashboards and upload data.
-
-### 2. Data Upload & Processing
-- [x] **Drag & Drop Interface:** An intuitive file upload zone for PDFs and CSV bank statements.
-- [x] **Upload Progress & Status:** Real-time feedback during file upload and background processing (integrating with the backend task queue).
-- [x] **Error Handling:** Clear notifications for unsupported file types or parsing failures.
-
-### 3. Dashboard & Data Visualization
-- [x] **Summary Overview:** Key metrics like total income, total expenses, and net savings for the selected period.
-- [x] **Transaction Table:** A comprehensive view of all transactions with sorting, filtering, and pagination.
-- [x] **Interactive Charts:** Visualizing spending by category, income vs. expenses, and historical trends.
-- [ ] **Manual Adjustments:** Allowing users to manually correct AI-categorized transactions.
-
-### 4. Dockerization
-- [ ] **Dockerfile:** Creating a multi-stage Dockerfile optimized for a production Next.js build.
-- [ ] **Docker Compose Integration:** Ensuring seamless integration with the existing backend and worker containers for easy local development and deployment.
-
-### 5. UI/UX Enhancements
-- [x] **Modern Aesthetics:** Implementing a clean, responsive design using a utility-first CSS framework or specialized UI components.
-- [x] **Notifications System:** Toast notifications to keep the user informed about system alerts and errors.
+| Layer | Technology |
+|---|---|
+| Framework | [Next.js 14](https://nextjs.org/) (App Router) |
+| Language | TypeScript |
+| Styling | Vanilla CSS (custom design system, dark mode) |
+| Notifications | [Sonner](https://sonner.emilkowalski.dev/) |
+| Icons | [Lucide React](https://lucide.dev/) |
+| Package Manager | pnpm |
 
 ---
 
-## Local Development (Current Setup)
-
-First, run the development server:
+## Local Development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). The app expects the backend running at `http://localhost:8000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
+
+## Project Structure
+
+```
+frontend/
+├── app/
+│   ├── layout.tsx                    # Root layout — fetches current user server-side
+│   ├── page.tsx                      # Dashboard (summary, charts)
+│   ├── login/page.tsx                # Sign-in page
+│   ├── register/page.tsx             # Registration page
+│   ├── upload/page.tsx               # PDF upload
+│   ├── jobs/
+│   │   ├── page.tsx                  # Job list
+│   │   └── [jobId]/
+│   │       ├── page.tsx              # Job detail + debug dialogs
+│   │       └── transactions/page.tsx # Transaction table for a job
+│   └── admin/reset/page.tsx          # Reset all user data
+├── components/
+│   ├── app-shell.tsx                 # Sidebar layout — auth-aware nav + user card
+│   ├── auth-form.tsx                 # Shared login/register form component
+│   ├── logout-button.tsx             # Client-side logout button
+│   ├── job-debug-dialogs.tsx         # PDF/markdown toggle viewer with copy support
+│   └── upload-form.tsx               # Drag-and-drop PDF upload form
+└── lib/
+    ├── api.ts                        # API client (apiFetch, auth helpers, types)
+    └── server-auth.ts                # Server-side getCurrentUserServer (reads cookie)
+```
+
+---
+
+## Feature Status
+
+### Authentication ✅
+- [x] **User Registration & Login:** `/register` and `/login` pages with a shared `AuthForm` component.
+- [x] **Cookie-Based Sessions:** `credentials: "include"` on all fetches; HTTP-only session cookie set by the backend.
+- [x] **Server-Side User Resolution:** `getCurrentUserServer()` in `server-auth.ts` reads the session cookie on the server and passes the user to `RootLayout`.
+- [x] **Auth-Aware Sidebar:** Shows user email + logout button when signed in; shows sign-in prompt and auth nav links when signed out.
+- [x] **Auth Route Layout:** Login/register pages render without the main nav shell.
+
+### Data Upload & Processing ✅
+- [x] **Drag & Drop Interface:** Intuitive file upload zone for PDF bank statements.
+- [x] **Upload Progress & Status:** Real-time polling for job status during background processing.
+- [x] **Error Handling:** Toast notifications for upload failures and backend errors.
+
+### Job Debug Viewer ✅
+- [x] **PDF/Markdown Toggle:** `JobDebugDialogs` streams and renders the original PDF or extracted markdown from the backend asset endpoints.
+- [x] **Copy to Clipboard:** One-click copy of the markdown content.
+- [x] **Open in New Tab:** Direct link to raw PDF or markdown asset.
+
+### Dashboard & Data Visualization ✅
+- [x] **Summary Overview:** Key metrics (total income, total expenses, net savings).
+- [x] **Transaction Table:** Sortable, filterable transactions per job.
+- [x] **Interactive Charts:** Spending by category, income vs. expenses.
+
+### Planned
+- [ ] **Protected Route Middleware:** Auto-redirect unauthenticated users to `/login` via Next.js middleware.
+- [ ] **Manual Transaction Corrections:** Allow users to override AI-assigned categories inline.
+- [ ] **Pagination:** Server-side pagination for large transaction sets.
+- [ ] **Dockerization:** Multi-stage `Dockerfile` and `docker-compose` integration with the backend.

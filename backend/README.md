@@ -1,24 +1,29 @@
-# Finance Tracker Backend
+# Finance Tracker — Backend
 
-This is the backend service for the Finance Tracker application, built with FastAPI, SQLite, and RQ for background job processing.
+FastAPI backend for the Bank Statement Analyzer. Handles PDF ingestion, LLM-powered transaction categorization, user authentication, and file asset delivery.
 
-## Tech Stack Overview
+## Tech Stack
 
-- **Web Framework:** [FastAPI](https://fastapi.tiangolo.com/) for building APIs.
-- **Database:** SQLite (for local development) with **SQLAlchemy** (ORM) and **Alembic** (migrations).
-- **Background Jobs:** [RQ (Redis Queue)](https://python-rq.org/) combined with a `worker.py` script to handle asynchronous tasks like PDF parsing and LLM categorizations.
-- **Object Storage:** MinIO (S3-compatible object storage) using `boto3` for distributing file uploads reliably to background workers.
-- **PDF Extraction:** [Docling](https://ds4sd.github.io/docling/) for robust extraction of text and tables from uploaded PDF files.
-- **LLM Integration:** Ollama (or other LLMs) used via local models to categorize and structure financial transactions.
+| Layer | Technology |
+|---|---|
+| Web Framework | [FastAPI](https://fastapi.tiangolo.com/) |
+| Database | SQLite (dev) · SQLAlchemy ORM · Alembic migrations |
+| Auth | Cookie-based sessions (HTTP-only, SHA-256 token hashing, `bcrypt` passwords) |
+| Background Jobs | [RQ](https://python-rq.org/) + Redis · `worker.py` |
+| Object Storage | MinIO (S3-compatible) via `boto3` |
+| PDF Extraction | [Docling](https://ds4sd.github.io/docling/) |
+| LLM Integration | Ollama (local) for transaction categorization |
+
+---
 
 ## Local Development Setup
 
-Ensure you have a Redis server running locally or via Docker and Ollama accessible on its default port. You will also need MinIO running locally for S3 storage.
+Ensure **Redis**, **MinIO**, and **Ollama** are running before starting the server.
 
 1. **Install dependencies:**
    ```bash
    python -m venv .venv
-   source .venv/bin/activate  # Or .venv\Scripts\activate on Windows
+   source .venv/bin/activate  # or .venv\Scripts\activate on Windows
    pip install -r requirements.txt
    ```
 
@@ -27,44 +32,91 @@ Ensure you have a Redis server running locally or via Docker and Ollama accessib
    alembic upgrade head
    ```
 
-3. **Start the FastAPI Dev Server:**
+3. **Start the FastAPI dev server:**
    ```bash
    fastapi dev main.py
    ```
 
-4. **Start the Background Worker:**
-   In a separate terminal, to process PDF jobs:
+4. **Start the background worker** (separate terminal):
    ```bash
    python worker.py
    ```
 
+---
+
 ## Project Structure
 
-- `main.py`: Bootstraps the application and registers API routes.
-- `models.py`: SQLAlchemy ORM models (Transactions, Jobs, etc).
-- `db.py`: Database connection and session management.
-- `alembic/`: Database migration definitions.
-- `tasks.py`: Background job tasks run by the RQ worker. The worker downloads PDFs from MinIO to a temporary file before processing, then cleans it up.
-- `worker.py`: Custom RQ worker process script handling job processing.
-- `services/`: Contains specific business logic services (e.g., `llm.py`, `pdf.py`).
-- `storage.py`: S3 bucket initialization and configurations.
-- `logger.py`: Standard logging configurations.
+```
+backend/
+├── main.py              # App bootstrap, all API route definitions
+├── auth.py              # Session auth: hashing, cookie helpers, get_current_user
+├── models.py            # SQLAlchemy ORM models (User, Session, Job, Transaction)
+├── db.py                # DB engine and SessionLocal factory
+├── tasks.py             # RQ background tasks (process_pdf, retry_categorization)
+├── worker.py            # Custom RQ worker process
+├── storage.py           # S3/MinIO client, bucket init, key helpers
+├── logger.py            # Logging configuration
+├── alembic/             # Alembic migration environment and version scripts
+└── services/
+    ├── llm.py           # LLM integration for transaction categorization
+    ├── pdf.py           # Docling PDF-to-markdown conversion
+    └── rules.py         # Rules-based pre-categorization (runs before LLM)
+```
+
+---
+
+## API Reference
+
+### Auth
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/auth/register` | Create account, sets session cookie |
+| `POST` | `/auth/login` | Sign in, sets session cookie |
+| `POST` | `/auth/logout` | Destroys session, clears cookie |
+| `GET`  | `/auth/me` | Returns the current authenticated user |
+
+### Jobs
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/upload` | Upload a PDF bank statement |
+| `GET`  | `/jobs` | List all jobs for the current user |
+| `GET`  | `/jobs/{job_id}` | Get job status and metadata |
+| `GET`  | `/jobs/{job_id}/assets/pdf` | Stream the original uploaded PDF |
+| `GET`  | `/jobs/{job_id}/assets/markdown` | Stream the extracted markdown artifact |
+
+### Transactions
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET`  | `/transactions/{job_id}` | Get all transactions for a job |
+| `GET`  | `/categorize/retry/{job_id}` | Re-run LLM categorization on a job |
+
+### Admin
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/reset` | Delete all jobs and transactions for the current user |
+| `GET`  | `/health` | Health check |
 
 ---
 
 ## Completed Features
 
-- **S3 Object Storage (MinIO):** Fully implemented S3-compatible service for handling document uploads reliably across distributed workers. Features include automatic bucket initialization, file upload handling, secure worker downloads to temporary files with guaranteed cleanup, and orphaned file deletion upon application reset.
+- **Cookie-based Auth:** Secure HTTP-only session cookies with bcrypt password hashing and SHA-256 token storage. All job/transaction endpoints are scoped to the authenticated user.
+- **Alembic Migrations:** Full migration history including the `users` and `sessions` tables with SQLAlchemy `MetaData` naming conventions for reliable constraint names.
+- **S3 Object Storage (MinIO):** S3-compatible storage for uploads, with automatic bucket initialization, per-worker temporary file cleanup, and markdown artifact upload post-processing.
+- **Rules-Based Pre-Categorization:** `services/rules.py` deterministically categorizes well-known merchants before sending remaining transactions to the LLM, reducing latency and API cost.
+- **PDF & Markdown Asset Endpoints:** `/jobs/{id}/assets/pdf` and `/jobs/{id}/assets/markdown` stream job assets directly from S3 with ownership checks.
+- **30-Minute RQ Timeout:** Extended job timeout for large PDFs processed by slow local LLMs.
 
-## TODOs for Future Setups
+---
 
-> **Note:** The following are planned improvements and architectural changes meant to make the service production-ready.
+## TODOs
 
-- [ ] **S3 Garbage Collection:** Implement a background worker that runs on a schedule (e.g., off-peak hours) to identify and delete S3 objects that have no corresponding job record in the database, with a configurable age threshold to protect in-flight uploads.
-- [ ] **Docker Setup:** Update and verify the `Dockerfile` and `docker-compose.yml` to properly orchestrate the API, RQ worker, Redis, Database, and MinIO with optimal configurations.
-- [ ] **Configuration Management:** Implement structured application settings using `pydantic-settings` to securely and cleanly load sensitive credentials, database paths, and API endpoints from Environment Variables rather than hardcoding.
-- [ ] **Proper Database for Production:** Switch out SQLite for PostgreSQL or MySQL when moving to a production environment.
-- [ ] **User Authentication API:** Setup JWT-based authentication endpoints (registration/log in) and secure existing routes.
-- [ ] **Dashboard API Endpoints:** Create robust endpoints to serve summarized reporting data, paginated transactions, and analytical metrics to the frontend.
-- [ ] **Error Handling & Validation:** Improve input validation and standard error responses across all API endpoints.
-- [ ] **Unit and Integration Tests:** Set up `pytest` to validate core endpoints and background job execution.
+> Planned improvements toward production-readiness.
+
+- [ ] **S3 Garbage Collection:** Background task to prune S3 objects with no matching job record.
+- [ ] **Docker Setup:** Finalize `Dockerfile` and `docker-compose.yml` to orchestrate API, worker, Redis, DB, and MinIO.
+- [ ] **Configuration Management:** Migrate to `pydantic-settings` for env-based config instead of scattered `os.getenv` calls.
+- [ ] **Production Database:** Replace SQLite with PostgreSQL for production deployments.
+- [ ] **Dashboard Endpoints:** Aggregated reporting endpoints (spending by category, income vs. expenses, date ranges).
+- [ ] **Error Handling & Validation:** Standardize error responses and add request-level input validation.
+- [ ] **Unit & Integration Tests:** `pytest` coverage for auth flows, job endpoints, and background tasks.
