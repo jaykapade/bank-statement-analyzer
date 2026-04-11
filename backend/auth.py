@@ -3,21 +3,14 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 import hashlib
 import hmac
-import os
 import secrets
 import uuid
 
 from fastapi import Depends, HTTPException, Request, Response, status
 
+from config import settings
 from db import SessionLocal
 from models import Session, User
-
-SESSION_COOKIE_NAME = os.getenv("SESSION_COOKIE_NAME", "finance_tracker_session")
-SESSION_MAX_AGE_SECONDS = int(
-    os.getenv("SESSION_MAX_AGE_SECONDS", str(60 * 60 * 24 * 7))
-)
-SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
-PBKDF2_ITERATIONS = int(os.getenv("PASSWORD_HASH_ITERATIONS", "600000"))
 
 
 def get_db():
@@ -45,11 +38,9 @@ def hash_password(password: str) -> str:
         "sha256",
         password.encode("utf-8"),
         salt.encode("utf-8"),
-        PBKDF2_ITERATIONS,
+        settings.password_hash_iterations,
     )
-    return (
-        f"pbkdf2_sha256${PBKDF2_ITERATIONS}${salt}${derived_key.hex()}"
-    )
+    return f"pbkdf2_sha256${settings.password_hash_iterations}${salt}${derived_key.hex()}"
 
 
 def verify_password(password: str, stored_hash: str) -> bool:
@@ -87,7 +78,7 @@ def create_session(db, user: User) -> str:
         user_id=user.id,
         token_hash=hash_session_token(token),
         created_at=utcnow(),
-        expires_at=utcnow() + timedelta(seconds=SESSION_MAX_AGE_SECONDS),
+        expires_at=utcnow() + timedelta(seconds=settings.session_max_age_seconds),
     )
     clear_existing_sessions(db, user.id)
     db.add(session)
@@ -97,27 +88,29 @@ def create_session(db, user: User) -> str:
 
 def apply_session_cookie(response: Response, token: str):
     response.set_cookie(
-        key=SESSION_COOKIE_NAME,
+        key=settings.session_cookie_name,
         value=token,
         httponly=True,
-        secure=SESSION_COOKIE_SECURE,
+        secure=settings.session_cookie_secure,
         samesite="lax",
-        max_age=SESSION_MAX_AGE_SECONDS,
+        max_age=settings.session_max_age_seconds,
         path="/",
     )
 
 
 def clear_session_cookie(response: Response):
-    response.delete_cookie(key=SESSION_COOKIE_NAME, path="/", samesite="lax")
+    response.delete_cookie(
+        key=settings.session_cookie_name, path="/", samesite="lax"
+    )
 
 
 def destroy_session(db, token: str | None):
     if not token:
         return
 
-    db.query(Session).filter(Session.token_hash == hash_session_token(token)).delete(
-        synchronize_session=False
-    )
+    db.query(Session).filter(
+        Session.token_hash == hash_session_token(token)
+    ).delete(synchronize_session=False)
     db.commit()
 
 
@@ -129,9 +122,11 @@ def serialize_user(user: User):
 
 
 def get_current_user(request: Request, db=Depends(get_db)) -> User:
-    token = request.cookies.get(SESSION_COOKIE_NAME)
+    token = request.cookies.get(settings.session_cookie_name)
     if not token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+        )
 
     session = (
         db.query(Session)
@@ -143,10 +138,14 @@ def get_current_user(request: Request, db=Depends(get_db)) -> User:
     )
 
     if not session:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+        )
 
     user = db.query(User).filter(User.id == session.user_id).first()
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+        )
 
     return user

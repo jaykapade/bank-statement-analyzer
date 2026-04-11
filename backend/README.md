@@ -106,6 +106,7 @@ backend/
 - **Rules-Based Pre-Categorization:** `services/rules.py` deterministically categorizes well-known merchants before sending remaining transactions to the LLM, reducing latency and API cost.
 - **PDF & Markdown Asset Endpoints:** `/jobs/{id}/assets/pdf` and `/jobs/{id}/assets/markdown` stream job assets directly from S3 with ownership checks.
 - **30-Minute RQ Timeout:** Extended job timeout for large PDFs processed by slow local LLMs.
+- **Config Management:** Migrate to `pydantic-settings` for env-based config instead of scattered `os.getenv` calls.
 
 ---
 
@@ -115,7 +116,6 @@ backend/
 
 - [ ] **S3 Garbage Collection:** Background task to prune S3 objects with no matching job record.
 - [ ] **Docker Setup:** Finalize `Dockerfile` and `docker-compose.yml` to orchestrate API, worker, Redis, DB, and MinIO.
-- [ ] **Configuration Management:** Migrate to `pydantic-settings` for env-based config instead of scattered `os.getenv` calls.
 - [ ] **Production Database:** Replace SQLite with PostgreSQL for production deployments.
 - [ ] **Dashboard Endpoints:** Aggregated reporting endpoints (spending by category, income vs. expenses, date ranges).
 - [ ] **Error Handling & Validation:** Standardize error responses and add request-level input validation.

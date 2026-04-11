@@ -1,12 +1,8 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = "sqlite:///./finance.db"
+from config import settings
 
-engine = create_engine(DATABASE_URL, echo=True)
+engine = create_engine(settings.database_url, echo=settings.db_echo)
 
-SessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=engine
-)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

@@ -2,18 +2,7 @@ import httpx
 import json
 import re
 from logger import logger
-
-OLLAMA_URL = "http://localhost:11434/api/generate"
-# MODEL = "qwen2.5:7b"
-MODEL = "deepseek-r1:7b"
-
-# Max characters per extraction chunk (tune based on model context window)
-# Keep low enough that Ollama can finish within its 180-second server timeout.
-# local models are slow; 3500 chars ≈ ~60-90 seconds per chunk on most hardware.
-MAX_CHUNK_CHARS = 3500
-# Max transactions per categorization batch.
-# Smaller = less output per call = less chance of truncated/malformed JSON.
-CATEGORIZE_BATCH_SIZE = 8
+from config import settings
 
 
 # -----------------------------
@@ -32,8 +21,8 @@ def call_ollama(prompt: str) -> str:
         tokens: list[str] = []
         with httpx.stream(
             "POST",
-            OLLAMA_URL,
-            json={"model": MODEL, "prompt": prompt, "stream": True},
+            settings.ollama_url,
+            json={"model": settings.ollama_model, "prompt": prompt, "stream": True},
             timeout=None,  # no client-side limit; Ollama server controls its own timeout
         ) as response:
             response.raise_for_status()
@@ -104,7 +93,7 @@ def safe_json_loads(text: str):
 # -----------------------------
 # Retry Wrapper
 # -----------------------------
-def call_with_retry(prompt: str, retries: int = 2):
+def call_with_retry(prompt: str, retries: int = settings.llm_retry_attempts):
     for attempt in range(retries):
         raw_output = call_ollama(prompt)
 
@@ -130,7 +119,7 @@ def call_with_retry(prompt: str, retries: int = 2):
 # -----------------------------
 # Markdown Chunking (table-aware)
 # -----------------------------
-def chunk_markdown(markdown: str, max_chars: int = MAX_CHUNK_CHARS) -> list[str]:
+def chunk_markdown(markdown: str, max_chars: int = settings.llm_max_chunk_chars) -> list[str]:
     """
     Split markdown into chunks of at most max_chars while preserving table structure.
 
@@ -365,7 +354,7 @@ def categorize_transactions(transactions: list):
 
     all_categorized: list = []
     had_failure = False
-    batch_size = CATEGORIZE_BATCH_SIZE
+    batch_size = settings.llm_categorize_batch_size
 
     batches = [
         transactions[i : i + batch_size]

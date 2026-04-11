@@ -1,4 +1,3 @@
-import os
 import sys
 
 # RQ's scheduler.py calls get_context('fork') at import time.
@@ -18,10 +17,10 @@ if sys.platform == "win32":
 
 from redis import Redis
 from rq import Queue
+from config import settings
 from storage import init_bucket
 
-redis_host = os.getenv("REDIS_HOST", "localhost")
-redis_conn = Redis(host=redis_host, port=6379)
+redis_conn = Redis(host=settings.redis_host, port=settings.redis_port)
 
 if __name__ == "__main__":
     try:
@@ -30,7 +29,6 @@ if __name__ == "__main__":
         print(f"[Worker] Failed to init S3 bucket: {e}", file=sys.stderr)
         sys.exit(1)
 
-    # Queue defined here only to pass to the worker
     queue = Queue(connection=redis_conn)
 
     if sys.platform == "win32":

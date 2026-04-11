@@ -20,17 +20,16 @@ if sys.platform == "win32":
 
 from fastapi import FastAPI, UploadFile, File, Request, HTTPException, Response, Depends
 from fastapi.middleware.cors import CORSMiddleware
-import os
 import uuid
 import io
-from storage import s3, BUCKET_NAME, init_bucket
+from config import settings
+from storage import s3, init_bucket
 from storage import get_markdown_object_key
 
 from redis import Redis
 from rq import Queue
 
 from auth import (
-    SESSION_COOKIE_NAME,
     apply_session_cookie,
     clear_session_cookie,
     create_session,
@@ -71,9 +70,7 @@ class AuthRequest(BaseModel):
 
 def get_owned_job_or_404(session, job_id: str, user_id: str):
     job = (
-        session.query(Job)
-        .filter(Job.job_id == job_id, Job.user_id == user_id)
-        .first()
+        session.query(Job).filter(Job.job_id == job_id, Job.user_id == user_id).first()
     )
 
     if not job:
@@ -84,7 +81,7 @@ def get_owned_job_or_404(session, job_id: str, user_id: str):
 
 def read_s3_bytes_or_404(object_key: str) -> bytes:
     try:
-        response = s3.get_object(Bucket=BUCKET_NAME, Key=object_key)
+        response = s3.get_object(Bucket=settings.bucket_name, Key=object_key)
     except ClientError as exc:
         error_code = exc.response.get("Error", {}).get("Code")
         if error_code in {"NoSuchKey", "404"}:
@@ -117,21 +114,16 @@ def ensure_markdown_bytes(job: Job) -> bytes:
 
 
 def validate_password(password: str):
-    if len(password) < 8:
+    if len(password) < settings.password_min_length:
         raise HTTPException(
             status_code=400,
-            detail="Password must be at least 8 characters long",
+            detail=f"Password must be at least {settings.password_min_length} characters long",
         )
 
 
-frontend_origins = os.getenv(
-    "FRONTEND_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
-)
-allowed_origins = [origin.strip() for origin in frontend_origins.split(",") if origin.strip()]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -139,8 +131,7 @@ app.add_middleware(
 
 
 # Redis connection
-redis_host = os.getenv("REDIS_HOST", "localhost")
-redis_conn = Redis(host=redis_host, port=6379)
+redis_conn = Redis(host=settings.redis_host, port=settings.redis_port)
 
 queue = Queue(connection=redis_conn)
 
@@ -210,7 +201,7 @@ def login(payload: AuthRequest, response: Response, db=Depends(get_db)):
 
 @app.post("/auth/logout")
 def logout(request: Request, response: Response, db=Depends(get_db)):
-    destroy_session(db, request.cookies.get(SESSION_COOKIE_NAME))
+    destroy_session(db, request.cookies.get(settings.session_cookie_name))
     clear_session_cookie(response)
     return {"message": "Logged out"}
 
@@ -230,7 +221,7 @@ async def upload_file(
 
     logger.info(f"Uploading {file.filename} to S3")
     file_bytes = await file.read()
-    s3.put_object(Bucket=BUCKET_NAME, Key=object_key, Body=file_bytes)
+    s3.put_object(Bucket=settings.bucket_name, Key=object_key, Body=file_bytes)
     logger.info(f"Uploaded {file.filename} to S3: {object_key}")
 
     # Create the job record so it's immediately visible to /jobs/{job_id}
@@ -254,8 +245,10 @@ async def upload_file(
         session.close()
 
     try:
-        # try sending job to Redis (30-min timeout for large PDFs + slow LLMs)
-        queue.enqueue(process_pdf, object_key, job_id, job_timeout=1800)
+        # try sending job to Redis
+        queue.enqueue(
+            process_pdf, object_key, job_id, job_timeout=settings.job_timeout_seconds
+        )
 
     except Exception as e:
         logger.error(f"Redis/RQ enqueue failed for job {job_id}: {e}", exc_info=True)
@@ -427,7 +420,9 @@ def retry_job(job_id: str, current_user: User = Depends(get_current_user)):
         session.close()
 
     try:
-        queue.enqueue(retry_categorization, job_id, job_timeout=1800)
+        queue.enqueue(
+            retry_categorization, job_id, job_timeout=settings.job_timeout_seconds
+        )
     except Exception as e:
         logger.error(f"Redis/RQ enqueue failed for retry {job_id}: {e}", exc_info=True)
         raise HTTPException(
