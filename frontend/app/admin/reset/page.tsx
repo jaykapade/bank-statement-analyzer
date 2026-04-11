@@ -1,6 +1,9 @@
 import { SectionCard } from "@/components/section-card";
+import { requireCurrentUser } from "@/lib/server-auth";
 
-export default function ResetPage() {
+export default async function ResetPage() {
+  await requireCurrentUser();
+
   return (
     <div className="space-y-6">
       <SectionCard

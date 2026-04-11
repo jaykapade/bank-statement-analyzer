@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AppShell } from "@/components/app-shell";
 import { Toaster } from "sonner";
+import { getCurrentUserServer } from "@/lib/server-auth";
 
 export const metadata: Metadata = {
   title: "Finance Tracker",
@@ -9,11 +10,13 @@ export const metadata: Metadata = {
     "A premium financial dashboard for uploads, job tracking, and transaction review.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const user = await getCurrentUserServer();
+
   return (
     <html lang="en" className="h-full antialiased">
       <body
@@ -23,18 +26,11 @@ export default function RootLayout({
         <Toaster
           closeButton
           expand={false}
-          position="top-right"
+          position="bottom-right"
           richColors
           theme="dark"
-          toastOptions={{
-            style: {
-              background: "rgba(12, 20, 34, 0.94)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              color: "#f4f7fb",
-            },
-          }}
         />
-        <AppShell>{children}</AppShell>
+        <AppShell user={user}>{children}</AppShell>
       </body>
     </html>
   );

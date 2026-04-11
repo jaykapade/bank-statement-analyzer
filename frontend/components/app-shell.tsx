@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { Clock3, Command, LayoutDashboard, Upload } from "lucide-react";
+import type { AuthUser } from "@/lib/api";
+import { LogoutButton } from "@/components/logout-button";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -19,10 +21,27 @@ function isActive(pathname: string, href: string) {
   return pathname.startsWith(href);
 }
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({
+  children,
+  user,
+}: {
+  children: ReactNode;
+  user: AuthUser | null;
+}) {
   const pathname = usePathname();
+  const isAuthRoute = pathname === "/login" || pathname === "/register";
   const activeItem =
     navItems.find((item) => isActive(pathname, item.href)) ?? navItems[0];
+
+  if (!user && isAuthRoute) {
+    return (
+      <div className="dashboard-grid min-h-screen">
+        <main className="mx-auto flex min-h-screen w-full max-w-6xl items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
+          <div className="w-full max-w-3xl">{children}</div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard-grid min-h-screen">
@@ -44,26 +63,77 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
 
             <nav className="mt-6 flex flex-1 flex-col gap-2">
-              {navItems.map((item) => {
-                const active = item.href === activeItem.href;
-                const Icon = item.icon;
+              {user
+                ? navItems.map((item) => {
+                    const active = item.href === activeItem.href;
+                    const Icon = item.icon;
 
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`nav-chip rounded-[1.25rem] px-4 py-3 ${
-                      active
-                        ? "border border-cyan-300/18 bg-[linear-gradient(135deg,rgba(56,189,248,0.14),rgba(255,255,255,0.03))] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_10px_24px_rgba(8,18,34,0.22)]"
-                        : ""
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span>{item.label}</span>
-                  </Link>
-                );
-              })}
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={`nav-chip rounded-[1.25rem] px-4 py-3 ${
+                          active
+                            ? "border border-cyan-300/18 bg-[linear-gradient(135deg,rgba(56,189,248,0.14),rgba(255,255,255,0.03))] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_10px_24px_rgba(8,18,34,0.22)]"
+                            : ""
+                        }`}
+                      >
+                        <Icon className="h-4 w-4" />
+                        <span>{item.label}</span>
+                      </Link>
+                    );
+                  })
+                : [
+                    <Link
+                      key="/login"
+                      href="/login"
+                      className={`nav-chip rounded-[1.25rem] px-4 py-3 ${
+                        pathname === "/login"
+                          ? "border border-cyan-300/18 bg-[linear-gradient(135deg,rgba(56,189,248,0.14),rgba(255,255,255,0.03))] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_10px_24px_rgba(8,18,34,0.22)]"
+                          : ""
+                      }`}
+                    >
+                      <span>Sign in</span>
+                    </Link>,
+                    <Link
+                      key="/register"
+                      href="/register"
+                      className={`nav-chip rounded-[1.25rem] px-4 py-3 ${
+                        pathname === "/register"
+                          ? "border border-cyan-300/18 bg-[linear-gradient(135deg,rgba(56,189,248,0.14),rgba(255,255,255,0.03))] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_10px_24px_rgba(8,18,34,0.22)]"
+                          : ""
+                      }`}
+                    >
+                      <span>Create account</span>
+                    </Link>,
+                  ]}
             </nav>
+
+            <div className="mt-6 rounded-[1.5rem] border border-white/8 bg-white/4 p-4">
+              {user ? (
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.24em] text-[var(--color-mist)]">
+                      Signed in
+                    </p>
+                    <p className="mt-2 break-all text-sm font-medium text-white">
+                      {user.email}
+                    </p>
+                  </div>
+                  <LogoutButton />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm leading-6 text-[var(--color-mist)]">
+                    Sign in to upload statements and keep each job tied to your
+                    own workspace.
+                  </p>
+                  <Link className="button-primary w-full text-center" href="/login">
+                    Sign in
+                  </Link>
+                </div>
+              )}
+            </div>
           </div>
         </aside>
 

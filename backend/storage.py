@@ -21,3 +21,7 @@ def init_bucket():
         s3.head_bucket(Bucket=BUCKET_NAME)
     except Exception:
         s3.create_bucket(Bucket=BUCKET_NAME)
+
+
+def get_markdown_object_key(pdf_object_key: str) -> str:
+    return f"{pdf_object_key}.md"

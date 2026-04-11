@@ -3,14 +3,17 @@ import { ErrorToast } from "@/components/error-toast";
 import { JobsTable } from "@/components/jobs-table";
 import { SectionCard } from "@/components/section-card";
 import { SummaryCard } from "@/components/summary-card";
-import { getJobs, type JobListItem } from "@/lib/api";
+import { type JobListItem } from "@/lib/api";
+import { getJobsServer, requireCurrentUser } from "@/lib/server-auth";
 
 export default async function JobsPage() {
+  await requireCurrentUser();
+
   let jobs: JobListItem[] = [];
   let error: string | null = null;
 
   try {
-    const response = await getJobs();
+    const response = await getJobsServer();
     jobs = response.jobs;
   } catch (caughtError) {
     error =

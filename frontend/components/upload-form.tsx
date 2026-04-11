@@ -89,6 +89,7 @@ export function UploadForm() {
       const response = await fetch(`${getApiBaseUrl()}/upload`, {
         method: "POST",
         body: formData,
+        credentials: "include",
       });
 
       const payload = (await response.json()) as {

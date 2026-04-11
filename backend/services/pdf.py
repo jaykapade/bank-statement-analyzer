@@ -4,6 +4,7 @@ from docling.datamodel.pipeline_options import (
     PdfPipelineOptions,
     TableStructureOptions,
     TableFormerMode,
+    AcceleratorOptions,
 )
 from logger import logger
 
@@ -25,6 +26,9 @@ def get_converter():
         pipeline_options.table_structure_options = TableStructureOptions(
             do_cell_matching=True,  # Align predicted structure with actual PDF text
             mode=TableFormerMode.ACCURATE,  # Full model; slower but handles irregular layouts
+        )
+        pipeline_options.accelerator_options = AcceleratorOptions(
+            num_threads=1  # Limit threads to prevent std::bad_alloc during OOM
         )
 
         _converter = DocumentConverter(

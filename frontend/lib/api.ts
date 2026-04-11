@@ -39,6 +39,15 @@ export type TransactionsResponse = {
   transactions: Transaction[];
 };
 
+export type AuthUser = {
+  id: string;
+  email: string;
+};
+
+export type AuthResponse = {
+  user: AuthUser;
+};
+
 type ApiErrorShape = {
   detail?: string;
 };
@@ -47,7 +56,7 @@ export function getApiBaseUrl() {
   return (
     process.env.NEXT_PUBLIC_API_BASE_URL ??
     process.env.API_BASE_URL ??
-    "http://127.0.0.1:8000"
+    "http://localhost:8000"
   );
 }
 
@@ -55,6 +64,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   const response = await fetch(`${getApiBaseUrl()}${path}`, {
     ...init,
     cache: "no-store",
+    credentials: "include",
   });
 
   if (!response.ok) {
@@ -89,4 +99,30 @@ export async function retryCategorization(jobId: string) {
   return apiFetch<{ message: string; job_id: string }>(
     `/categorize/retry/${jobId}`,
   );
+}
+
+export async function register(email: string, password: string) {
+  return apiFetch<AuthResponse>("/auth/register", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function login(email: string, password: string) {
+  return apiFetch<AuthResponse>("/auth/login", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function logout() {
+  return apiFetch<{ message: string }>("/auth/logout", {
+    method: "POST",
+  });
 }

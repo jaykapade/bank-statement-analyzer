@@ -3,7 +3,8 @@ import { ErrorToast } from "@/components/error-toast";
 import { SectionCard } from "@/components/section-card";
 import { SummaryCard } from "@/components/summary-card";
 import { TransactionsTable } from "@/components/transactions-table";
-import { getTransactions, type Transaction } from "@/lib/api";
+import { type Transaction } from "@/lib/api";
+import { getTransactionsServer, requireCurrentUser } from "@/lib/server-auth";
 
 type TransactionsPageProps = {
   params: Promise<{ jobId: string }>;
@@ -19,12 +20,14 @@ function formatAmount(value: number) {
 export default async function TransactionsPage({
   params,
 }: TransactionsPageProps) {
+  await requireCurrentUser();
+
   const { jobId } = await params;
   let transactions: Transaction[] = [];
   let error: string | null = null;
 
   try {
-    const response = await getTransactions(jobId);
+    const response = await getTransactionsServer(jobId);
     transactions = response.transactions;
   } catch (caughtError) {
     error =
