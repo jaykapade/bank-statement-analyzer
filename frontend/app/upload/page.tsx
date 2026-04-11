@@ -1,7 +1,10 @@
 import { SectionCard } from "@/components/section-card";
 import { UploadForm } from "@/components/upload-form";
+import { requireCurrentUser } from "@/lib/server-auth";
 
-export default function UploadPage() {
+export default async function UploadPage() {
+  await requireCurrentUser();
+
   return (
     <div className="space-y-6">
       <section className="grid gap-6 md:grid-cols-3">

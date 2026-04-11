@@ -4,11 +4,14 @@ import { ReceiptText, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { BudgetChart } from "@/components/charts/budget-chart";
 import { SpendingChart } from "@/components/charts/spending-chart";
 import {
-  getJobs,
-  getTransactions,
   type JobListItem,
   type Transaction,
 } from "@/lib/api";
+import {
+  getJobsServer,
+  getTransactionsServer,
+  requireCurrentUser,
+} from "@/lib/server-auth";
 
 type TrendPoint = {
   day: string;
@@ -116,11 +119,11 @@ function buildBudgetData(transactions: Transaction[]) {
 }
 
 async function loadDashboardData() {
-  const jobsResponse = await getJobs();
+  const jobsResponse = await getJobsServer();
   const jobs = jobsResponse.jobs;
   const transactionJobs = jobs.filter((job) => job.status !== "pending");
   const transactionResponses = await Promise.allSettled(
-    transactionJobs.map((job) => getTransactions(job.job_id)),
+    transactionJobs.map((job) => getTransactionsServer(job.job_id)),
   );
 
   const allTransactions = transactionResponses.flatMap((result) =>
@@ -191,6 +194,8 @@ function EmptyDashboard({ jobs }: { jobs: JobListItem[] }) {
 }
 
 export default async function Home() {
+  await requireCurrentUser();
+
   let jobs: JobListItem[] = [];
   let transactions: Transaction[] = [];
   let error: string | null = null;

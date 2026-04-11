@@ -4,12 +4,16 @@ import re
 from logger import logger
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "qwen2.5:7b"
+# MODEL = "qwen2.5:7b"
+MODEL = "deepseek-r1:7b"
 
 # Max characters per extraction chunk (tune based on model context window)
-MAX_CHUNK_CHARS = 8000
-# Max transactions per categorization batch
-CATEGORIZE_BATCH_SIZE = 15
+# Keep low enough that Ollama can finish within its 180-second server timeout.
+# local models are slow; 3500 chars ≈ ~60-90 seconds per chunk on most hardware.
+MAX_CHUNK_CHARS = 3500
+# Max transactions per categorization batch.
+# Smaller = less output per call = less chance of truncated/malformed JSON.
+CATEGORIZE_BATCH_SIZE = 8
 
 
 # -----------------------------
@@ -55,21 +59,46 @@ def clean_json_response(text: str) -> str:
     """
     Removes ```json ... ``` wrappers from LLM output
     """
-
-    # remove markdown code blocks
     text = re.sub(r"```json", "", text)
     text = re.sub(r"```", "", text)
-
     return text.strip()
 
 
+def extract_json_objects(text: str) -> list | None:
+    """
+    Fallback: when the LLM returns a syntactically broken JSON array, attempt
+    to salvage individual valid JSON objects from the raw text using regex.
+    This handles the common case where the array is well-formed up until the
+    last object, which may be truncated or have a dangling comma.
+    """
+    # Find every {...} blob (non-greedy won't work across newlines — use re.DOTALL)
+    raw_objects = re.findall(r"\{[^{}]+\}", text, re.DOTALL)
+    salvaged = []
+    for raw in raw_objects:
+        try:
+            obj = json.loads(raw)
+            if not isinstance(obj, dict):
+                continue  # skip non-dict objects (nested arrays, primitives, etc.)
+            salvaged.append(obj)
+        except Exception:
+            pass  # skip objects that are themselves malformed
+    return salvaged if salvaged else None
+
+
 def safe_json_loads(text: str):
+    cleaned = clean_json_response(text)
     try:
-        cleaned = clean_json_response(text)
         return json.loads(cleaned)
     except Exception as e:
         logger.error(f"JSON parse failed: {e}")
-        return None
+
+    # Try salvaging individual objects from broken output
+    salvaged = extract_json_objects(cleaned)
+    if salvaged:
+        logger.warning(f"Salvaged {len(salvaged)} object(s) from malformed JSON")
+        return salvaged
+
+    return None
 
 
 # -----------------------------
@@ -78,6 +107,14 @@ def safe_json_loads(text: str):
 def call_with_retry(prompt: str, retries: int = 2):
     for attempt in range(retries):
         raw_output = call_ollama(prompt)
+
+        # Empty response means Ollama timed out or returned nothing — retry
+        if not raw_output or not raw_output.strip():
+            logger.warning(
+                f"Retrying LLM call (attempt {attempt + 1}) — empty response"
+            )
+            continue
+
         parsed = safe_json_loads(raw_output)
 
         # ✅ valid JSON (including empty list)
@@ -189,6 +226,9 @@ A transaction row always has:
 
 Rules:
 - IGNORE: page headers, bank name, account number, branch info, opening balance, closing balance, total rows, legal text, image captions, any row without a clear date
+- IGNORE: the STATEMENT SUMMARY section — this contains aggregate figures like "Previous Balance", "Purchases / Charges", "Cash Advances", "Payments / Credits", and "Total Amount Due". These are summary totals with NO associated date or serial number — they are NOT individual transactions.
+- IGNORE: the CREDIT SUMMARY section — it contains credit limit and available credit figures, not transactions.
+- IGNORE: any amount that appears in running/paragraph text (not inside a proper table row) without both a date AND a serial/transaction number. For example, standalone amounts like "61,165.81", "1,33,291.53", "1,39,471.36" are statement-level totals — skip them entirely.
 - IGNORE: any table that shows hypothetical or illustrative examples — these include "Interest calculation", "Minimum Amount Due Calculation", "Late Payment Charges Calculation", or any table with headings like "SL. No", "Transaction", containing example purchases/fees used to illustrate bank policy
 - IGNORE: EMI / Personal Loan summary tables showing installment schedules, not actual transactions
 - For amounts: strip currency symbols (₹, $, £, €) and commas. If a statement uses separate debit/credit columns, use negative numbers for debits and positive for credits. "CR" suffix means credit (positive).
@@ -252,6 +292,11 @@ def normalize_transactions(transactions: list):
     normalized = []
 
     for t in transactions:
+        # Guard: LLM salvage can occasionally return non-dict items
+        if not isinstance(t, dict):
+            logger.warning(f"Skipping non-dict transaction entry: {type(t)} {t!r}")
+            continue
+
         # date is required
         raw_date = t.get("date")
         if raw_date in (None, "", "None"):

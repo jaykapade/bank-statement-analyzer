@@ -3,10 +3,11 @@ import uuid
 from logger import setup_logger
 from models import Job, Transaction, CategoryStatus
 from services.llm import extract_transactions, categorize_transactions
+from services.rules import rules_categorize
 from services.pdf import extract_markdown
 import tempfile
 import os
-from storage import s3, BUCKET_NAME
+from storage import s3, BUCKET_NAME, get_markdown_object_key
 
 logger = setup_logger("worker")
 
@@ -40,6 +41,10 @@ def save_transactions(session, job_id, transactions):
 def update_categories(session, job_id, categorized):
     # STEP 1: mark successful ones — match by id (exact, unambiguous)
     for t in categorized:
+        if not isinstance(t, dict):
+            logger.warning(f"[DB] Skipping non-dict categorized entry: {type(t)} {t!r}")
+            continue
+
         txn_id = t.get("id")
         category = t.get("category")
 
@@ -109,8 +114,16 @@ def process_pdf(object_key: str, job_id: str):
 
         # STEP 1: PDF → Markdown
         markdown = extract_markdown(file_path)
+        markdown_object_key = get_markdown_object_key(object_key)
+        s3.put_object(
+            Bucket=BUCKET_NAME,
+            Key=markdown_object_key,
+            Body=markdown.encode("utf-8"),
+            ContentType="text/markdown; charset=utf-8",
+        )
+        logger.info(f"[Worker] Uploaded markdown debug artifact to {markdown_object_key}")
 
-        # STEP 2: Extract Transactions
+        # STEP 2: Extract Transactions (LLM)
         transactions = extract_transactions(markdown)
 
         # ❌ only true failure
@@ -131,7 +144,7 @@ def process_pdf(object_key: str, job_id: str):
             session.query(Transaction).filter(Transaction.job_id == job_id).all()
         )
 
-        transactions_for_llm = [
+        transactions_for_categorization = [
             {
                 "id": str(t.id),
                 "date": str(t.date),
@@ -141,17 +154,24 @@ def process_pdf(object_key: str, job_id: str):
             for t in saved_rows
         ]
 
-        # STEP 4: Categorize
-        categorized = categorize_transactions(transactions_for_llm)
+        # STEP 4a: Rules-based pre-categorization (fast, deterministic)
+        rule_matched, llm_needed = rules_categorize(transactions_for_categorization)
+        rule_results = [{"id": t["id"], "category": t["category"]} for t in rule_matched]
 
-        # ❌ only true failure
+        # STEP 4b: LLM categorization for remaining transactions
+        categorized = categorize_transactions(llm_needed)
+
+        # ❌ only true failure — but if rules caught some, partial results are still useful
         if categorized is None:
-            update_job_status(session, job_id, "categorize_failed")
-            session.commit()
-            return
+            if not rule_results:
+                update_job_status(session, job_id, "categorize_failed")
+                session.commit()
+                return
+            logger.warning("[Worker] LLM categorization failed; applying rule results only")
+            categorized = []
 
-        # STEP 5: Update Categories
-        update_categories(session, job_id, categorized)
+        # STEP 5: Update Categories (merge rule results + LLM results)
+        update_categories(session, job_id, rule_results + categorized)
 
         # STEP 6: Check if any failed remain
         remaining_failed = (
@@ -233,16 +253,23 @@ def retry_categorization(job_id: str):
             for t in rows
         ]
 
-        # STEP 3: categorize
-        categorized = categorize_transactions(transactions)
+        # STEP 3a: Rules-based pre-categorization
+        rule_matched, llm_needed = rules_categorize(transactions)
+        rule_results = [{"id": t["id"], "category": t["category"]} for t in rule_matched]
+
+        # STEP 3b: LLM for remaining
+        categorized = categorize_transactions(llm_needed)
 
         if categorized is None:
-            update_job_status(session, job_id, "categorize_failed")
-            session.commit()
-            return
+            if not rule_results:
+                update_job_status(session, job_id, "categorize_failed")
+                session.commit()
+                return
+            logger.warning("[Worker] LLM categorization failed; applying rule results only")
+            categorized = []
 
-        # STEP 4: update categories FIRST
-        update_categories(session, job_id, categorized)
+        # STEP 4: Update categories (merge rule results + LLM results)
+        update_categories(session, job_id, rule_results + categorized)
 
         # STEP 5: check remaining failures
         remaining_failed = (

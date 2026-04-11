@@ -1,16 +1,22 @@
 import Link from "next/link";
 import { ErrorToast } from "@/components/error-toast";
 import { RetryCategorizationButton } from "@/components/retry-categorization-button";
+import { JobDebugDialogs } from "@/components/job-debug-dialogs";
 import { SectionCard } from "@/components/section-card";
 import { StatusBadge } from "@/components/status-badge";
 import { SummaryCard } from "@/components/summary-card";
 import { TransactionsTable } from "@/components/transactions-table";
 import {
-  getJob,
-  getTransactions,
+  getApiBaseUrl,
   type JobDetail,
   type Transaction,
 } from "@/lib/api";
+import {
+  getJobServer,
+  serverApiText,
+  getTransactionsServer,
+  requireCurrentUser,
+} from "@/lib/server-auth";
 
 type JobDetailPageProps = {
   params: Promise<{ jobId: string }>;
@@ -24,15 +30,21 @@ function formatAmount(value: number) {
 }
 
 export default async function JobDetailPage({ params }: JobDetailPageProps) {
+  await requireCurrentUser();
+
   const { jobId } = await params;
   let job: JobDetail | null = null;
   let transactions: Transaction[] = [];
+  let markdownPreview: string | null = null;
   let error: string | null = null;
 
   try {
     const [jobResponse, transactionsResponse] = await Promise.all([
-      getJob(jobId),
-      getTransactions(jobId).catch(() => ({ job_id: jobId, transactions: [] })),
+      getJobServer(jobId),
+      getTransactionsServer(jobId).catch(() => ({
+        job_id: jobId,
+        transactions: [],
+      })),
     ]);
 
     job = jobResponse;
@@ -44,12 +56,23 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
         : "Unable to load this job.";
   }
 
+  try {
+    markdownPreview = await serverApiText(`/jobs/${jobId}/assets/markdown`);
+  } catch {
+  }
+
   const transactionTotal = transactions.reduce(
     (sum, transaction) => sum + transaction.amount,
     0,
   );
+  const markdownLineCount = markdownPreview
+    ? markdownPreview.split(/\r?\n/).length
+    : 0;
+  const markdownCharCount = markdownPreview?.length ?? 0;
   const canRetry =
     job?.status === "categorize_failed" && transactions.length > 0;
+  const pdfPreviewUrl = `${getApiBaseUrl()}/jobs/${jobId}/assets/pdf`;
+  const markdownPreviewUrl = `${getApiBaseUrl()}/jobs/${jobId}/assets/markdown`;
 
   return (
     <div className="space-y-5">
@@ -119,6 +142,15 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
           </div>
         </SectionCard>
       </section>
+
+      <JobDebugDialogs
+        jobId={jobId}
+        markdownCharCount={markdownCharCount}
+        markdownLineCount={markdownLineCount}
+        markdownPreview={markdownPreview}
+        markdownPreviewUrl={markdownPreviewUrl}
+        pdfPreviewUrl={pdfPreviewUrl}
+      />
 
       <SectionCard
         title="Transaction table"

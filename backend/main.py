@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
+from pydantic import BaseModel
 from models import CategoryStatus
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 import sys
 import multiprocessing
 import multiprocessing.context
@@ -17,19 +18,36 @@ if sys.platform == "win32":
 
     multiprocessing.context.BaseContext.get_context = _patched_get_context
 
-from fastapi import FastAPI, UploadFile, File, Request, HTTPException
+from fastapi import FastAPI, UploadFile, File, Request, HTTPException, Response, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import uuid
+import io
 from storage import s3, BUCKET_NAME, init_bucket
+from storage import get_markdown_object_key
 
 from redis import Redis
 from rq import Queue
 
+from auth import (
+    SESSION_COOKIE_NAME,
+    apply_session_cookie,
+    clear_session_cookie,
+    create_session,
+    destroy_session,
+    get_current_user,
+    get_db,
+    hash_password,
+    normalize_email,
+    serialize_user,
+    utcnow,
+    verify_password,
+)
 from db import SessionLocal
-from models import Job, Transaction, JobStatus
+from models import Job, Transaction, JobStatus, User
 from tasks import process_pdf, retry_categorization
 from logger import logger
+from botocore.exceptions import ClientError
 
 
 @asynccontextmanager
@@ -44,6 +62,66 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+class AuthRequest(BaseModel):
+    email: str
+    password: str
+
+
+def get_owned_job_or_404(session, job_id: str, user_id: str):
+    job = (
+        session.query(Job)
+        .filter(Job.job_id == job_id, Job.user_id == user_id)
+        .first()
+    )
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    return job
+
+
+def read_s3_bytes_or_404(object_key: str) -> bytes:
+    try:
+        response = s3.get_object(Bucket=BUCKET_NAME, Key=object_key)
+    except ClientError as exc:
+        error_code = exc.response.get("Error", {}).get("Code")
+        if error_code in {"NoSuchKey", "404"}:
+            raise HTTPException(status_code=404, detail="Preview not available")
+        logger.error(f"Failed to read S3 object {object_key}: {exc}", exc_info=True)
+        raise HTTPException(status_code=502, detail="Unable to load preview")
+
+    body = response["Body"]
+    try:
+        return body.read()
+    finally:
+        body.close()
+
+
+def ensure_markdown_bytes(job: Job) -> bytes:
+    """
+    Read the pre-generated markdown artifact from S3.
+
+    NOTE: We intentionally do NOT fall back to running Docling here.
+    The worker is responsible for generating and uploading the markdown artifact.
+    Running Docling inside the FastAPI process in parallel with the worker
+    causes two concurrent Docling instances → memory exhaustion → segfault.
+    If the artifact isn't ready yet, return 404 and let the client retry.
+    """
+    if not job.s3_url:
+        raise HTTPException(status_code=404, detail="Preview not available")
+
+    markdown_key = get_markdown_object_key(job.s3_url)
+    return read_s3_bytes_or_404(markdown_key)
+
+
+def validate_password(password: str):
+    if len(password) < 8:
+        raise HTTPException(
+            status_code=400,
+            detail="Password must be at least 8 characters long",
+        )
 
 
 frontend_origins = os.getenv(
@@ -91,8 +169,62 @@ def healthy():
     return {"status": "healthy"}
 
 
+@app.post("/auth/register", status_code=201)
+def register(payload: AuthRequest, response: Response, db=Depends(get_db)):
+    email = normalize_email(payload.email)
+    validate_password(payload.password)
+
+    existing_user = db.query(User).filter(User.email == email).first()
+    if existing_user:
+        raise HTTPException(status_code=409, detail="Email is already registered")
+
+    user = User(
+        id=str(uuid.uuid4()),
+        email=email,
+        password_hash=hash_password(payload.password),
+        created_at=utcnow(),
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    token = create_session(db, user)
+    apply_session_cookie(response, token)
+
+    return {"user": serialize_user(user)}
+
+
+@app.post("/auth/login")
+def login(payload: AuthRequest, response: Response, db=Depends(get_db)):
+    email = normalize_email(payload.email)
+    user = db.query(User).filter(User.email == email).first()
+
+    if not user or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    token = create_session(db, user)
+    apply_session_cookie(response, token)
+
+    return {"user": serialize_user(user)}
+
+
+@app.post("/auth/logout")
+def logout(request: Request, response: Response, db=Depends(get_db)):
+    destroy_session(db, request.cookies.get(SESSION_COOKIE_NAME))
+    clear_session_cookie(response)
+    return {"message": "Logged out"}
+
+
+@app.get("/auth/me")
+def me(current_user: User = Depends(get_current_user)):
+    return {"user": serialize_user(current_user)}
+
+
 @app.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
     job_id = str(uuid.uuid4())
     object_key = f"{job_id}/{file.filename}"
 
@@ -107,6 +239,7 @@ async def upload_file(file: UploadFile = File(...)):
         session.add(
             Job(
                 job_id=job_id,
+                user_id=current_user.id,
                 status=JobStatus.pending,
                 filename=file.filename,
                 s3_url=object_key,
@@ -121,8 +254,8 @@ async def upload_file(file: UploadFile = File(...)):
         session.close()
 
     try:
-        # try sending job to Redis
-        queue.enqueue(process_pdf, object_key, job_id)
+        # try sending job to Redis (30-min timeout for large PDFs + slow LLMs)
+        queue.enqueue(process_pdf, object_key, job_id, job_timeout=1800)
 
     except Exception as e:
         logger.error(f"Redis/RQ enqueue failed for job {job_id}: {e}", exc_info=True)
@@ -136,10 +269,15 @@ async def upload_file(file: UploadFile = File(...)):
 
 
 @app.get("/jobs")
-def get_jobs():
+def get_jobs(current_user: User = Depends(get_current_user)):
     session = SessionLocal()
     try:
-        jobs = session.query(Job).all()
+        jobs = (
+            session.query(Job)
+            .filter(Job.user_id == current_user.id)
+            .order_by(Job.job_id.desc())
+            .all()
+        )
         return {
             "jobs": [
                 {
@@ -155,11 +293,15 @@ def get_jobs():
 
 
 @app.get("/jobs/{job_id}")
-def get_job_status(job_id: str):
+def get_job_status(job_id: str, current_user: User = Depends(get_current_user)):
     session = SessionLocal()
 
     try:
-        job = session.query(Job).filter(Job.job_id == job_id).first()
+        job = (
+            session.query(Job)
+            .filter(Job.job_id == job_id, Job.user_id == current_user.id)
+            .first()
+        )
 
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
@@ -207,9 +349,18 @@ def get_job_status(job_id: str):
 
 
 @app.get("/transactions/{job_id}")
-def get_transactions(job_id: str):
+def get_transactions(job_id: str, current_user: User = Depends(get_current_user)):
     session = SessionLocal()
     try:
+        job = (
+            session.query(Job)
+            .filter(Job.job_id == job_id, Job.user_id == current_user.id)
+            .first()
+        )
+
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+
         transactions = (
             session.query(Transaction).filter(Transaction.job_id == job_id).all()
         )
@@ -234,11 +385,15 @@ def get_transactions(job_id: str):
 
 
 @app.get("/categorize/retry/{job_id}")
-def retry_job(job_id: str):
+def retry_job(job_id: str, current_user: User = Depends(get_current_user)):
     session = SessionLocal()
 
     try:
-        job = session.query(Job).filter(Job.job_id == job_id).first()
+        job = (
+            session.query(Job)
+            .filter(Job.job_id == job_id, Job.user_id == current_user.id)
+            .first()
+        )
 
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
@@ -272,7 +427,7 @@ def retry_job(job_id: str):
         session.close()
 
     try:
-        queue.enqueue(retry_categorization, job_id)
+        queue.enqueue(retry_categorization, job_id, job_timeout=1800)
     except Exception as e:
         logger.error(f"Redis/RQ enqueue failed for retry {job_id}: {e}", exc_info=True)
         raise HTTPException(
@@ -283,12 +438,63 @@ def retry_job(job_id: str):
 
 
 @app.post("/reset")
-def reset():
+def reset(current_user: User = Depends(get_current_user)):
     session = SessionLocal()
     try:
-        session.query(Transaction).delete()
-        session.query(Job).delete()
+        jobs = session.query(Job).filter(Job.user_id == current_user.id).all()
+        job_ids = [job.job_id for job in jobs]
+
+        if job_ids:
+            session.query(Transaction).filter(Transaction.job_id.in_(job_ids)).delete(
+                synchronize_session=False
+            )
+
+        session.query(Job).filter(Job.user_id == current_user.id).delete(
+            synchronize_session=False
+        )
         session.commit()
         return {"message": "Reset successful"}
+    finally:
+        session.close()
+
+
+@app.get("/jobs/{job_id}/assets/pdf")
+def preview_job_pdf(job_id: str, current_user: User = Depends(get_current_user)):
+    session = SessionLocal()
+    try:
+        job = get_owned_job_or_404(session, job_id, current_user.id)
+        if not job.s3_url:
+            raise HTTPException(status_code=404, detail="Preview not available")
+
+        pdf_bytes = read_s3_bytes_or_404(job.s3_url)
+        filename = job.filename or f"{job_id}.pdf"
+        headers = {
+            "Content-Disposition": f'inline; filename="{filename}"',
+            "Cache-Control": "no-store",
+        }
+        return StreamingResponse(
+            io.BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers=headers,
+        )
+    finally:
+        session.close()
+
+
+@app.get("/jobs/{job_id}/assets/markdown")
+def preview_job_markdown(job_id: str, current_user: User = Depends(get_current_user)):
+    session = SessionLocal()
+    try:
+        job = get_owned_job_or_404(session, job_id, current_user.id)
+        markdown_bytes = ensure_markdown_bytes(job)
+        headers = {
+            "Content-Disposition": f'inline; filename="{job_id}.md"',
+            "Cache-Control": "no-store",
+        }
+        return Response(
+            content=markdown_bytes,
+            media_type="text/markdown; charset=utf-8",
+            headers=headers,
+        )
     finally:
         session.close()
