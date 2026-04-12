@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { Clock3, Command, LayoutDashboard, Upload } from "lucide-react";
 import type { AuthUser } from "@/lib/api";
 import { LogoutButton } from "@/components/logout-button";
+import { ResetButton } from "@/components/reset-button";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -109,7 +110,12 @@ export function AppShell({
                   ]}
             </nav>
 
-            <div className="mt-6 rounded-[1.5rem] border border-white/8 bg-white/4 p-4">
+              {user && (
+                <div className="mb-4">
+                  <ResetButton />
+                </div>
+              )}
+            <div className="mt-auto rounded-[1.5rem] border border-white/8 bg-white/4 p-4">
               {user ? (
                 <div className="space-y-3">
                   <div>

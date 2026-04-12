@@ -14,8 +14,18 @@ export type JobListItem = {
   filename: string | null;
 };
 
+export type PaginationMeta = {
+  page: number;
+  limit: number;
+  total: number;
+  total_pages: number;
+  has_next: boolean;
+  has_prev: boolean;
+};
+
 export type JobListResponse = {
   jobs: JobListItem[];
+  pagination: PaginationMeta;
 };
 
 export type JobDetail = {
@@ -37,6 +47,65 @@ export type Transaction = {
 export type TransactionsResponse = {
   job_id: string;
   transactions: Transaction[];
+  pagination: PaginationMeta;
+};
+
+export type AnalysisSummary = {
+  total_income: number;
+  total_expenses: number;
+  net_flow: number;
+  transaction_count: number;
+  uncategorized_count: number;
+  date_range: {
+    from: string | null;
+    to: string | null;
+  };
+  jobs: {
+    total: number;
+    completed: number;
+    pending: number;
+    failed: number;
+  };
+};
+
+export type SpendingTrendPoint = {
+  period: string;
+  income: number;
+  expenses: number;
+};
+
+export type SpendingTrendResponse = {
+  trend: SpendingTrendPoint[];
+  group_by: "day" | "week" | "month";
+};
+
+export type CategoryBreakdownItem = {
+  name: string;
+  amount: number;
+  count: number;
+};
+
+export type CategoryBreakdownResponse = {
+  categories: CategoryBreakdownItem[];
+  type: "expense" | "income" | "all";
+};
+
+export type JobAnalysisSummary = {
+  job_id: string;
+  status: JobStatus;
+  filename: string | null;
+  category_counts: {
+    total: number;
+    done: number;
+    pending: number;
+    failed: number;
+  };
+  transaction_summary: {
+    count: number;
+    total_income: number;
+    total_expenses: number;
+    net_flow: number;
+  };
 };
 
 export type AuthUser = {
@@ -83,17 +152,43 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   return (await response.json()) as T;
 }
 
-export async function getJobs() {
-  return apiFetch<JobListResponse>("/jobs");
+export async function getJobs(page = 1, limit = 20) {
+  return apiFetch<JobListResponse>(`/jobs?page=${page}&limit=${limit}`);
 }
 
 export async function getJob(jobId: string) {
   return apiFetch<JobDetail>(`/jobs/${jobId}`);
 }
 
-export async function getTransactions(jobId: string) {
-  return apiFetch<TransactionsResponse>(`/transactions/${jobId}`);
+export async function getTransactions(jobId: string, page = 1, limit = 50) {
+  return apiFetch<TransactionsResponse>(
+    `/transactions/${jobId}?page=${page}&limit=${limit}`,
+  );
 }
+
+export async function getAnalysisSummary() {
+  return apiFetch<AnalysisSummary>("/analysis/summary");
+}
+
+export async function getSpendingTrend(groupBy: "day" | "week" | "month" = "day") {
+  return apiFetch<SpendingTrendResponse>(
+    `/analysis/spending-trend?group_by=${groupBy}`,
+  );
+}
+
+export async function getCategoryBreakdown(
+  type: "expense" | "income" | "all" = "expense",
+  limit = 5,
+) {
+  return apiFetch<CategoryBreakdownResponse>(
+    `/analysis/categories?type=${type}&limit=${limit}`,
+  );
+}
+
+export async function getJobAnalysisSummary(jobId: string) {
+  return apiFetch<JobAnalysisSummary>(`/analysis/jobs/${jobId}/summary`);
+}
+
 
 export async function retryCategorization(jobId: string) {
   return apiFetch<{ message: string; job_id: string }>(
@@ -123,6 +218,12 @@ export async function login(email: string, password: string) {
 
 export async function logout() {
   return apiFetch<{ message: string }>("/auth/logout", {
+    method: "POST",
+  });
+}
+
+export async function resetAccount() {
+  return apiFetch<{ message: string }>("/admin/reset", {
     method: "POST",
   });
 }
