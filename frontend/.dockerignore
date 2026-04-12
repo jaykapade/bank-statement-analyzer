@@ -1,0 +1,10 @@
+node_modules
+.next
+.turbo
+.git
+.gitignore
+README.md
+Dockerfile
+npm-debug.log*
+pnpm-debug.log*
+*.local
