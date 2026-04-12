@@ -10,6 +10,7 @@ import {
   getJobsServer,
   requireCurrentUser,
 } from "@/lib/server-auth";
+import { Button } from "@/components/ui/button";
 
 type JobsPageProps = {
   searchParams?: Promise<{ page?: string }>;
@@ -71,9 +72,9 @@ export default async function JobsPage({ searchParams }: JobsPageProps) {
 
       {error ? (
         <SectionCard title="Jobs unavailable" body="Try again or upload a new statement.">
-          <Link className="button-secondary" href="/upload">
-            Go to upload
-          </Link>
+          <Button asChild variant="secondary">
+            <Link href="/upload">Go to upload</Link>
+          </Button>
         </SectionCard>
       ) : (
         <>

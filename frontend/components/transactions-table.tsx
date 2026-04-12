@@ -1,4 +1,14 @@
 import type { Transaction } from "@/lib/api";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 function formatCurrency(amount: number) {
   const formatted = new Intl.NumberFormat("en-US", {
@@ -15,62 +25,43 @@ export function TransactionsTable({
 }) {
   if (transactions.length === 0) {
     return (
-      <div className="rounded-[1.5rem] border border-white/10 bg-white/4 p-6 text-sm leading-6 text-[var(--color-mist)]">
-        Transactions will appear here once extraction has finished.
-      </div>
+      <Card className="rounded-[1.5rem] bg-white/4">
+        <CardContent className="p-6 text-sm leading-6 text-[var(--color-mist)]">
+          Transactions will appear here once extraction has finished.
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-white/4">
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-white/10">
-          <thead className="bg-black/10">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs uppercase tracking-[0.24em] text-[var(--color-mist)]">
-                Date
-              </th>
-              <th className="px-4 py-3 text-left text-xs uppercase tracking-[0.24em] text-[var(--color-mist)]">
-                Description
-              </th>
-              <th className="px-4 py-3 text-left text-xs uppercase tracking-[0.24em] text-[var(--color-mist)]">
-                Category
-              </th>
-              <th className="px-4 py-3 text-right text-xs uppercase tracking-[0.24em] text-[var(--color-mist)]">
-                Amount
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/8">
-            {transactions.map((transaction, index) => (
-              <tr key={`${transaction.date}-${transaction.description}-${index}`}>
-                <td className="px-4 py-4 text-sm text-[var(--color-paper)]">
-                  {transaction.date}
-                </td>
-                <td className="px-4 py-4 text-sm text-[var(--color-paper)]">
-                  {transaction.description}
-                </td>
-                <td className="px-4 py-4 text-sm text-[var(--color-paper)]">
-                  {transaction.category || "Uncategorized"}
-                </td>
-                <td
-                  className="px-4 py-4 text-right"
+    <Card className="overflow-hidden rounded-[1.5rem] bg-white/4">
+      <Table>
+        <TableHeader className="bg-black/10">
+          <TableRow className="hover:bg-black/10">
+            <TableHead>Date</TableHead>
+            <TableHead>Description</TableHead>
+            <TableHead>Category</TableHead>
+            <TableHead className="text-right">Amount</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {transactions.map((transaction, index) => (
+            <TableRow key={`${transaction.date}-${transaction.description}-${index}`}>
+              <TableCell>{transaction.date}</TableCell>
+              <TableCell>{transaction.description}</TableCell>
+              <TableCell>{transaction.category || "Uncategorized"}</TableCell>
+              <TableCell className="text-right">
+                <Badge
+                  className="font-mono text-sm normal-case tracking-normal"
+                  variant={transaction.amount >= 0 ? "success" : "destructive"}
                 >
-                  <span
-                    className={`inline-flex rounded-full px-3 py-1 font-mono text-sm font-semibold ${
-                      transaction.amount >= 0
-                        ? "bg-emerald-400/14 text-emerald-300 ring-1 ring-emerald-400/20"
-                        : "bg-red-400/14 text-red-300 ring-1 ring-red-400/20"
-                    }`}
-                  >
-                    {formatCurrency(transaction.amount)}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+                  {formatCurrency(transaction.amount)}
+                </Badge>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Card>
   );
 }

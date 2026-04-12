@@ -7,6 +7,8 @@ import { Clock3, Command, LayoutDashboard, Upload } from "lucide-react";
 import type { AuthUser } from "@/lib/api";
 import { LogoutButton } from "@/components/logout-button";
 import { ResetButton } from "@/components/reset-button";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -47,7 +49,7 @@ export function AppShell({
   return (
     <div className="dashboard-grid min-h-screen">
       <div className="relative mx-auto flex min-h-screen w-full max-w-[1600px] flex-col gap-6 px-4 py-4 sm:px-6 lg:flex-row lg:px-8 lg:py-6">
-        <aside className="dashboard-surface rounded-[2rem] p-4 lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:w-[280px] lg:flex-none">
+        <Card className="rounded-[2rem] p-4 lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:w-[280px] lg:flex-none">
           <div className="flex h-full flex-col">
             <div className="flex items-center gap-3 rounded-[1.5rem] border border-white/8 bg-[linear-gradient(135deg,rgba(56,189,248,0.16),rgba(129,140,248,0.1),rgba(255,255,255,0.03))] px-4 py-4">
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,rgba(56,189,248,0.95),rgba(129,140,248,0.85))] text-slate-950">
@@ -70,43 +72,46 @@ export function AppShell({
                     const Icon = item.icon;
 
                     return (
-                      <Link
+                      <Button
                         key={item.href}
-                        href={item.href}
-                        className={`nav-chip rounded-[1.25rem] px-4 py-3 ${
-                          active
-                            ? "border border-cyan-300/18 bg-[linear-gradient(135deg,rgba(56,189,248,0.14),rgba(255,255,255,0.03))] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_10px_24px_rgba(8,18,34,0.22)]"
-                            : ""
-                        }`}
+                        asChild
+                        active={active}
+                        className="h-auto"
+                        size={null}
+                        variant="nav"
                       >
-                        <Icon className="h-4 w-4" />
-                        <span>{item.label}</span>
-                      </Link>
+                        <Link href={item.href}>
+                          <Icon className="h-4 w-4" />
+                          <span>{item.label}</span>
+                        </Link>
+                      </Button>
                     );
                   })
                 : [
-                    <Link
+                    <Button
                       key="/login"
-                      href="/login"
-                      className={`nav-chip rounded-[1.25rem] px-4 py-3 ${
-                        pathname === "/login"
-                          ? "border border-cyan-300/18 bg-[linear-gradient(135deg,rgba(56,189,248,0.14),rgba(255,255,255,0.03))] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_10px_24px_rgba(8,18,34,0.22)]"
-                          : ""
-                      }`}
+                      asChild
+                      active={pathname === "/login"}
+                      className="h-auto"
+                      size={null}
+                      variant="nav"
                     >
-                      <span>Sign in</span>
-                    </Link>,
-                    <Link
+                      <Link href="/login">
+                        <span>Sign in</span>
+                      </Link>
+                    </Button>,
+                    <Button
                       key="/register"
-                      href="/register"
-                      className={`nav-chip rounded-[1.25rem] px-4 py-3 ${
-                        pathname === "/register"
-                          ? "border border-cyan-300/18 bg-[linear-gradient(135deg,rgba(56,189,248,0.14),rgba(255,255,255,0.03))] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_10px_24px_rgba(8,18,34,0.22)]"
-                          : ""
-                      }`}
+                      asChild
+                      active={pathname === "/register"}
+                      className="h-auto"
+                      size={null}
+                      variant="nav"
                     >
-                      <span>Create account</span>
-                    </Link>,
+                      <Link href="/register">
+                        <span>Create account</span>
+                      </Link>
+                    </Button>,
                   ]}
             </nav>
 
@@ -134,14 +139,14 @@ export function AppShell({
                     Sign in to upload statements and keep each job tied to your
                     own workspace.
                   </p>
-                  <Link className="button-primary w-full text-center" href="/login">
-                    Sign in
-                  </Link>
+                  <Button asChild className="w-full">
+                    <Link href="/login">Sign in</Link>
+                  </Button>
                 </div>
               )}
             </div>
           </div>
-        </aside>
+        </Card>
 
         <div className="flex min-w-0 flex-1 flex-col gap-6">
           <main className="flex-1">{children}</main>

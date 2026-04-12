@@ -3,6 +3,8 @@ import { ReceiptText, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { BudgetChart } from "@/components/charts/budget-chart";
 import { SpendingChart } from "@/components/charts/spending-chart";
 import { ErrorToast } from "@/components/error-toast";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   getAnalysisSummaryServer,
   getCategoryBreakdownServer,
@@ -29,7 +31,8 @@ function EmptyDashboard({
   transactionCount: number;
 }) {
   return (
-    <section className="dashboard-surface rounded-[2rem] p-8">
+    <Card className="rounded-[2rem]">
+      <CardContent className="p-8">
       <p className="text-[11px] uppercase tracking-[0.28em] text-[var(--color-mist-strong)]">
         No transaction data yet
       </p>
@@ -71,11 +74,12 @@ function EmptyDashboard({
         </div>
       </div>
       <div className="mt-8 flex flex-wrap gap-3">
-        <Link className="button-secondary" href="/jobs">
-          View Jobs
-        </Link>
+        <Button asChild variant="secondary">
+          <Link href="/jobs">View Jobs</Link>
+        </Button>
       </div>
-    </section>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -110,7 +114,8 @@ export default async function Home() {
     return (
       <>
         {error ? <ErrorToast message={error} /> : null}
-        <section className="dashboard-surface rounded-[2rem] p-8">
+        <Card className="rounded-[2rem]">
+          <CardContent className="p-8">
           <p className="text-[11px] uppercase tracking-[0.28em] text-[var(--color-mist-strong)]">
             Dashboard unavailable
           </p>
@@ -118,11 +123,12 @@ export default async function Home() {
             Unable to load dashboard data.
           </h1>
           <div className="mt-8">
-            <Link className="button-secondary" href="/upload">
-              Go to upload
-            </Link>
+            <Button asChild variant="secondary">
+              <Link href="/upload">Go to upload</Link>
+            </Button>
           </div>
-        </section>
+          </CardContent>
+        </Card>
       </>
     );
   }
@@ -182,8 +188,9 @@ export default async function Home() {
 
   return (
     <div className="space-y-6">
-      <section className="dashboard-surface rounded-[2rem] p-4">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <Card className="rounded-[2rem]">
+        <CardContent className="p-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {quickStats.map((item) => (
             <div
               key={item.label}
@@ -198,21 +205,26 @@ export default async function Home() {
             </div>
           ))}
         </div>
-      </section>
+        </CardContent>
+      </Card>
 
       <section className="grid gap-4 xl:grid-cols-3">
         {metricCards.map((card) => {
           const Icon = card.icon;
 
           return (
-            <article
+            <Card
               key={card.label}
-              className={`metric-card relative overflow-hidden bg-gradient-to-br ${card.tone}`}
+              className={`relative overflow-hidden rounded-[1.6rem] bg-gradient-to-br ${card.tone}`}
             >
-              <div className="flex w-full items-start justify-between gap-4">
+              <CardContent className="flex min-h-[7.2rem] w-full items-start justify-between gap-4 p-5">
                 <div>
-                  <span>{card.label}</span>
-                  <strong className="mt-4 block">{card.value}</strong>
+                  <span className="text-[0.74rem] uppercase tracking-[0.24em] text-[var(--color-mist-strong)]">
+                    {card.label}
+                  </span>
+                  <strong className="mt-4 block font-mono text-[2rem] text-white">
+                    {card.value}
+                  </strong>
                   <p className="mt-3 text-sm text-[var(--color-mist)]">
                     {card.detail}
                   </p>
@@ -220,28 +232,25 @@ export default async function Home() {
                 <div className="rounded-2xl border border-white/10 bg-white/6 p-3 text-white">
                   <Icon className="h-5 w-5" />
                 </div>
-              </div>
-            </article>
+              </CardContent>
+            </Card>
           );
         })}
       </section>
 
       <section className="grid gap-6 2xl:grid-cols-[2fr_1fr]">
-        <article className="dashboard-surface flex min-h-[640px] flex-col rounded-[2rem] p-6">
-          <div className="flex flex-col gap-3">
+        <Card className="flex min-h-[640px] flex-col rounded-[2rem]">
+          <CardHeader className="flex flex-col gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.24em] text-[var(--color-mist-strong)]">
                 Trend
               </p>
-              <h2 className="mt-2 font-mono text-2xl font-semibold text-white">
-                Income vs. expenses
-              </h2>
+              <CardTitle className="mt-2">Income vs. expenses</CardTitle>
             </div>
-          </div>
-          <div className="mt-6 flex-1">
+          </CardHeader>
+          <CardContent className="flex flex-1 flex-col">
             <SpendingChart data={trendData} />
-          </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <div className="flex items-center justify-between rounded-[1.1rem] border border-white/8 bg-white/3 px-4 py-3">
               <div className="flex items-center gap-3">
                 <span className="h-3 w-3 rounded-full bg-emerald-400 shadow-[0_0_18px_rgba(52,211,153,0.4)]" />
@@ -260,20 +269,20 @@ export default async function Home() {
                 {formatCurrency(summary.total_expenses)}
               </span>
             </div>
-          </div>
-        </article>
+            </div>
+          </CardContent>
+        </Card>
 
-        <article className="dashboard-surface rounded-[2rem] p-6">
-          <div className="flex items-center justify-between gap-3">
+        <Card className="rounded-[2rem]">
+          <CardHeader className="flex flex-row items-center justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.24em] text-[var(--color-mist-strong)]">
                 Allocation
               </p>
-              <h2 className="mt-2 font-mono text-2xl font-semibold text-white">
-                Categories
-              </h2>
+              <CardTitle className="mt-2">Categories</CardTitle>
             </div>
-          </div>
+          </CardHeader>
+          <CardContent>
           {budgetData.length > 0 ? (
             <>
               <BudgetChart data={budgetData} />
@@ -303,23 +312,23 @@ export default async function Home() {
               transactions.
             </div>
           )}
-        </article>
+          </CardContent>
+        </Card>
       </section>
 
       <section>
-        <article className="dashboard-surface rounded-[2rem] p-6">
-          <div className="flex items-center justify-between gap-3">
+        <Card className="rounded-[2rem]">
+          <CardHeader className="flex flex-row items-center justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.24em] text-[var(--color-mist-strong)]">
                 Analysis
               </p>
-              <h2 className="mt-2 font-mono text-2xl font-semibold text-white">
-                Snapshot
-              </h2>
+              <CardTitle className="mt-2">Snapshot</CardTitle>
             </div>
             <ReceiptText className="h-5 w-5 text-[var(--color-mist)]" />
-          </div>
-          <div className="mt-6 grid gap-3 md:grid-cols-3">
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 md:grid-cols-3">
             <div className="rounded-[1.25rem] border border-white/8 bg-white/4 px-4 py-4">
               <p className="text-sm text-[var(--color-mist)]">Top categories</p>
               <p className="mt-2 font-mono text-2xl text-white">
@@ -338,16 +347,17 @@ export default async function Home() {
                 {summary.uncategorized_count}
               </p>
             </div>
-          </div>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link className="button-secondary" href="/jobs">
-              Browse jobs
-            </Link>
-            <Link className="button-secondary" href="/upload">
-              Upload another statement
-            </Link>
-          </div>
-        </article>
+            </div>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Button asChild variant="secondary">
+                <Link href="/jobs">Browse jobs</Link>
+              </Button>
+              <Button asChild variant="secondary">
+                <Link href="/upload">Upload another statement</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </section>
     </div>
   );

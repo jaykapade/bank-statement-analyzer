@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 type JobDebugDialogsProps = {
   jobId: string;
@@ -33,46 +35,43 @@ export function JobDebugDialogs({
 
   return (
     <>
-      <section className="dashboard-surface rounded-[1.75rem] p-6">
-        <p className="text-sm uppercase tracking-[0.3em] text-[var(--color-cyan)]">
-          Source Preview
-        </p>
-        <h2 className="mt-3 font-mono text-2xl font-semibold text-white">
-          Statement preview
-        </h2>
-        <p className="mt-3 max-w-4xl text-sm leading-7 text-[var(--color-mist)]">
-          Open the original uploaded PDF in a dialog and compare it against the
-          extracted rows. When markdown is available, you can inspect the exact
-          extraction input from here too.
-        </p>
-
-        <div className="mt-6 flex flex-wrap gap-3">
-          <button
-            className="button-primary"
-            onClick={() => setIsOpen(true)}
-            type="button"
-          >
-            Preview statement
-          </button>
-        </div>
-
-        {markdownPreview ? (
-          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:max-w-xl">
-            <div className="rounded-[1.25rem] border border-white/8 bg-black/15 p-4">
-              <p className="text-sm text-[var(--color-mist)]">Markdown lines</p>
-              <p className="mt-2 font-mono text-2xl text-white">
-                {markdownLineCount}
-              </p>
-            </div>
-            <div className="rounded-[1.25rem] border border-white/8 bg-black/15 p-4">
-              <p className="text-sm text-[var(--color-mist)]">Markdown chars</p>
-              <p className="mt-2 font-mono text-2xl text-white">
-                {markdownCharCount}
-              </p>
-            </div>
+      <Card>
+        <CardHeader>
+          <p className="text-sm uppercase tracking-[0.3em] text-[var(--color-cyan)]">
+            Source Preview
+          </p>
+          <CardTitle className="mt-1">Statement preview</CardTitle>
+          <CardDescription className="max-w-4xl">
+            Open the original uploaded PDF in a dialog and compare it against the
+            extracted rows. When markdown is available, you can inspect the exact
+            extraction input from here too.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={() => setIsOpen(true)} type="button">
+              Preview statement
+            </Button>
           </div>
-        ) : null}
-      </section>
+
+          {markdownPreview ? (
+            <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:max-w-xl">
+              <div className="rounded-[1.25rem] border border-white/8 bg-black/15 p-4">
+                <p className="text-sm text-[var(--color-mist)]">Markdown lines</p>
+                <p className="mt-2 font-mono text-2xl text-white">
+                  {markdownLineCount}
+                </p>
+              </div>
+              <div className="rounded-[1.25rem] border border-white/8 bg-black/15 p-4">
+                <p className="text-sm text-[var(--color-mist)]">Markdown chars</p>
+                <p className="mt-2 font-mono text-2xl text-white">
+                  {markdownCharCount}
+                </p>
+              </div>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
 
       {isOpen ? (
         <div
@@ -92,13 +91,9 @@ export function JobDebugDialogs({
                   PDF and markdown for {jobId}
                 </h3>
               </div>
-              <button
-                className="button-secondary"
-                onClick={() => setIsOpen(false)}
-                type="button"
-              >
+              <Button onClick={() => setIsOpen(false)} type="button" variant="secondary">
                 Close
-              </button>
+              </Button>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
               <div className="flex overflow-hidden rounded-full border border-white/10 bg-black/20 p-1">
@@ -128,14 +123,15 @@ export function JobDebugDialogs({
                 ) : null}
               </div>
               <div className="flex flex-wrap gap-3">
-                <a
-                  className="button-secondary"
-                  href={activeTab === "pdf" ? pdfPreviewUrl : markdownPreviewUrl}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  Open in new tab
-                </a>
+                <Button asChild type="button" variant="secondary">
+                  <a
+                    href={activeTab === "pdf" ? pdfPreviewUrl : markdownPreviewUrl}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    Open in new tab
+                  </a>
+                </Button>
               </div>
             </div>
             <div className="min-h-0 flex-1 px-6 pb-6">
@@ -161,13 +157,9 @@ export function JobDebugDialogs({
                           <span>{markdownCharCount} chars</span>
                         </div>
                       </div>
-                      <button
-                        className="button-secondary"
-                        onClick={handleCopy}
-                        type="button"
-                      >
+                      <Button onClick={handleCopy} type="button" variant="secondary">
                         {isCopied ? "Copied!" : "Copy"}
-                      </button>
+                      </Button>
                     </div>
                     <pre className="flex-1 overflow-auto p-4 font-mono text-xs leading-6 whitespace-pre-wrap text-[var(--color-paper)]">
                       {markdownPreview}

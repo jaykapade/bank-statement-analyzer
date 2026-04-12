@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { logout } from "@/lib/api";
+import { Button } from "@/components/ui/button";
 
 export function LogoutButton() {
   const router = useRouter();
@@ -26,13 +27,14 @@ export function LogoutButton() {
   }
 
   return (
-    <button
-      className="button-secondary w-full"
+    <Button
+      className="w-full"
       disabled={isSubmitting}
       onClick={handleLogout}
       type="button"
+      variant="secondary"
     >
       {isSubmitting ? "Signing out..." : "Sign out"}
-    </button>
+    </Button>
   );
 }

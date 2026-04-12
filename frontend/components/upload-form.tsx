@@ -9,6 +9,8 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { getApiBaseUrl } from "@/lib/api";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 type UploadState = {
   error: string | null;
@@ -175,14 +177,10 @@ export function UploadForm() {
       </label>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button
-          className="button-primary"
-          disabled={state.isSubmitting}
-          type="submit"
-        >
+        <Button disabled={state.isSubmitting} type="submit">
           {state.isSubmitting ? "Uploading..." : "Upload and process"}
-        </button>
-        <span className="pill">PDF only</span>
+        </Button>
+        <Badge variant="secondary">PDF only</Badge>
       </div>
 
       {state.error ? (

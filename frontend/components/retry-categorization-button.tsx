@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { retryCategorization } from "@/lib/api";
+import { Button } from "@/components/ui/button";
 
 type RetryCategorizationButtonProps = {
   jobId: string;
@@ -36,14 +37,14 @@ export function RetryCategorizationButton({
 
   return (
     <div className="space-y-3">
-      <button
-        className="button-secondary"
+      <Button
         disabled={disabled || isSubmitting}
         onClick={handleRetry}
         type="button"
+        variant="secondary"
       >
         {isSubmitting ? "Retrying..." : "Retry categorization"}
-      </button>
+      </Button>
     </div>
   );
 }
