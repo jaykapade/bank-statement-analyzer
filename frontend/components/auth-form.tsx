@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
 import { login, register } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type AuthFormProps = {
   mode: "login" | "register";
@@ -55,10 +57,9 @@ export function AuthForm({ mode }: AuthFormProps) {
         >
           Email
         </label>
-        <input
+        <Input
           id={`${mode}-email`}
           autoComplete="email"
-          className="w-full rounded-[1.15rem] border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-300/45"
           onChange={(event) => setEmail(event.target.value)}
           placeholder="you@example.com"
           type="email"
@@ -73,10 +74,9 @@ export function AuthForm({ mode }: AuthFormProps) {
         >
           Password
         </label>
-        <input
+        <Input
           id={`${mode}-password`}
           autoComplete={isLogin ? "current-password" : "new-password"}
-          className="w-full rounded-[1.15rem] border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-300/45"
           onChange={(event) => setPassword(event.target.value)}
           placeholder="At least 8 characters"
           type="password"
@@ -90,7 +90,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         </div>
       ) : null}
 
-      <button className="button-primary w-full" disabled={isSubmitting} type="submit">
+      <Button className="w-full" disabled={isSubmitting} type="submit">
         {isSubmitting
           ? isLogin
             ? "Signing in..."
@@ -98,7 +98,7 @@ export function AuthForm({ mode }: AuthFormProps) {
           : isLogin
             ? "Sign in"
             : "Create account"}
-      </button>
+      </Button>
 
       <p className="text-sm text-[var(--color-mist)]">
         {isLogin ? "Need an account?" : "Already have an account?"}{" "}

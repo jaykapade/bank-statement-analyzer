@@ -1,4 +1,12 @@
 import type { ReactNode } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 type SectionCardProps = {
   eyebrow?: string;
@@ -18,27 +26,19 @@ export function SectionCard({
   contentClassName,
 }: SectionCardProps) {
   return (
-    <section
-      className={`dashboard-surface flex h-full flex-col rounded-[1.75rem] p-6 ${className ?? ""}`}
-    >
-      {eyebrow ? (
-        <p className="text-sm uppercase tracking-[0.3em] text-[var(--color-cyan)]">
-          {eyebrow}
-        </p>
-      ) : null}
-      <h2
-        className={`${eyebrow ? "mt-3" : ""} font-mono text-2xl font-semibold text-white`}
-      >
-        {title}
-      </h2>
-      {body ? (
-        <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--color-mist)]">
-          {body}
-        </p>
-      ) : null}
+    <Card className={cn("flex h-full flex-col", className)}>
+      <CardHeader>
+        {eyebrow ? (
+          <p className="text-sm uppercase tracking-[0.3em] text-[var(--color-cyan)]">
+            {eyebrow}
+          </p>
+        ) : null}
+        <CardTitle className={eyebrow ? "mt-1" : ""}>{title}</CardTitle>
+        {body ? <CardDescription className="max-w-3xl">{body}</CardDescription> : null}
+      </CardHeader>
       {children ? (
-        <div className={`mt-6 flex-1 ${contentClassName ?? ""}`}>{children}</div>
+        <CardContent className={cn("flex-1", contentClassName)}>{children}</CardContent>
       ) : null}
-    </section>
+    </Card>
   );
 }

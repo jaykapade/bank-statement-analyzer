@@ -6,6 +6,8 @@ import { SectionCard } from "@/components/section-card";
 import { StatusBadge } from "@/components/status-badge";
 import { SummaryCard } from "@/components/summary-card";
 import { TransactionsTable } from "@/components/transactions-table";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   getApiBaseUrl,
   type JobAnalysisSummary,
@@ -87,9 +89,11 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
           body="Processing status and extracted rows for this upload."
         >
           {error || !job ? (
-            <div className="rounded-[1.25rem] border border-white/8 bg-white/4 p-5 text-sm leading-6 text-[var(--color-mist)]">
-              Return to the jobs list and try opening the workspace again.
-            </div>
+            <Card className="rounded-[1.25rem] bg-white/4">
+              <CardContent className="p-5 text-sm leading-6 text-[var(--color-mist)]">
+                Return to the jobs list and try opening the workspace again.
+              </CardContent>
+            </Card>
           ) : (
             <>
               <div className="grid gap-3 xl:grid-cols-2">
@@ -117,16 +121,13 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
               </div>
 
               <div className="mt-5 flex flex-wrap gap-3">
-                <Link
-                  className="button-primary"
-                  href={`/jobs/${jobId}/transactions`}
-                >
-                  Open dedicated table
-                </Link>
+                <Button asChild>
+                  <Link href={`/jobs/${jobId}/transactions`}>Open dedicated table</Link>
+                </Button>
                 {canRetry ? <RetryCategorizationButton jobId={jobId} /> : null}
-                <Link className="button-secondary" href="/jobs">
-                  Back to jobs
-                </Link>
+                <Button asChild variant="secondary">
+                  <Link href="/jobs">Back to jobs</Link>
+                </Button>
               </div>
             </>
           )}

@@ -1,5 +1,8 @@
 import Link from "next/link";
 import type { PaginationMeta } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 type PaginationNavProps = {
   pagination: PaginationMeta;
@@ -20,33 +23,47 @@ export function PaginationNav({
   const end = Math.min(pagination.page * pagination.limit, pagination.total);
 
   return (
-    <div className="mt-5 flex flex-col gap-3 rounded-[1.25rem] border border-white/8 bg-white/4 px-4 py-4 text-sm text-[var(--color-mist)] sm:flex-row sm:items-center sm:justify-between">
-      <p>
-        Showing {start}-{end} of {pagination.total} {label}
-      </p>
-      <div className="flex flex-wrap gap-2">
+    <Card className="mt-5 rounded-[1.25rem] bg-white/4">
+      <CardContent className="flex flex-col gap-3 px-4 py-4 text-sm text-[var(--color-mist)] sm:flex-row sm:items-center sm:justify-between">
+        <p>
+          Showing {start}-{end} of {pagination.total} {label}
+        </p>
+        <div className="flex flex-wrap gap-2">
         {pagination.has_prev ? (
-          <Link className="button-secondary" href={buildHref(pagination.page - 1)}>
-            Previous
-          </Link>
+          <Button asChild variant="secondary">
+            <Link href={buildHref(pagination.page - 1)}>Previous</Link>
+          </Button>
         ) : (
-          <span className="button-secondary pointer-events-none opacity-50">
+          <Button
+            aria-disabled="true"
+            className="pointer-events-none opacity-50"
+            variant="secondary"
+          >
             Previous
-          </span>
+          </Button>
         )}
-        <span className="rounded-full border border-white/10 px-4 py-2 font-mono text-xs text-white">
+        <span
+          className={cn(
+            "inline-flex h-11 items-center rounded-xl border border-white/10 px-4 font-mono text-xs text-white",
+          )}
+        >
           Page {pagination.page} of {pagination.total_pages}
         </span>
         {pagination.has_next ? (
-          <Link className="button-secondary" href={buildHref(pagination.page + 1)}>
-            Next
-          </Link>
+          <Button asChild variant="secondary">
+            <Link href={buildHref(pagination.page + 1)}>Next</Link>
+          </Button>
         ) : (
-          <span className="button-secondary pointer-events-none opacity-50">
+          <Button
+            aria-disabled="true"
+            className="pointer-events-none opacity-50"
+            variant="secondary"
+          >
             Next
-          </span>
+          </Button>
         )}
-      </div>
-    </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

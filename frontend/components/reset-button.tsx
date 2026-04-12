@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { resetAccount } from "@/lib/api";
+import { Button } from "@/components/ui/button";
 
 export function ResetButton() {
   const router = useRouter();
@@ -36,13 +37,14 @@ export function ResetButton() {
   }
 
   return (
-    <button
-      className="button-secondary w-full border-rose-500/20 text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/30"
+    <Button
+      className="w-full"
       disabled={isSubmitting}
       onClick={handleReset}
       type="button"
+      variant="destructive"
     >
       {isSubmitting ? "Resetting..." : "Reset Data"}
-    </button>
+    </Button>
   );
 }

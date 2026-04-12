@@ -1,61 +1,60 @@
 import Link from "next/link";
 import type { JobListItem } from "@/lib/api";
 import { StatusBadge } from "@/components/status-badge";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export function JobsTable({ jobs }: { jobs: JobListItem[] }) {
   if (jobs.length === 0) {
     return (
-      <div className="dashboard-surface rounded-[1.75rem] p-6 text-sm leading-6 text-[var(--color-mist)]">
-        No jobs yet. Upload a statement to create the first processing run.
-      </div>
+      <Card>
+        <CardContent className="p-6 text-sm leading-6 text-[var(--color-mist)]">
+          No jobs yet. Upload a statement to create the first processing run.
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="dashboard-surface overflow-hidden rounded-[1.75rem]">
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-white/10">
-          <thead className="bg-white/4">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs uppercase tracking-[0.24em] text-[var(--color-mist)]">
-                File
-              </th>
-              <th className="px-4 py-3 text-left text-xs uppercase tracking-[0.24em] text-[var(--color-mist)]">
-                Status
-              </th>
-              <th className="px-4 py-3 text-left text-xs uppercase tracking-[0.24em] text-[var(--color-mist)]">
-                Job ID
-              </th>
-              <th className="px-4 py-3 text-left text-xs uppercase tracking-[0.24em] text-[var(--color-mist)]">
-                Open
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/8">
-            {jobs.map((job) => (
-              <tr key={job.job_id} className="transition hover:bg-white/4">
-                <td className="px-4 py-4 text-sm text-[var(--color-paper)]">
-                  {job.filename || "Unnamed upload"}
-                </td>
-                <td className="px-4 py-4 text-sm text-[var(--color-paper)]">
-                  <StatusBadge status={job.status} />
-                </td>
-                <td className="px-4 py-4 font-mono text-xs text-[var(--color-mist)]">
-                  {job.job_id}
-                </td>
-                <td className="px-4 py-4 text-sm">
-                  <Link
-                    className="text-[var(--color-cyan)] underline-offset-4 hover:underline"
-                    href={`/jobs/${job.job_id}`}
-                  >
-                    Open job
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <Card className="overflow-hidden">
+      <Table>
+        <TableHeader className="bg-white/4">
+          <TableRow className="hover:bg-white/4">
+            <TableHead>File</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Job ID</TableHead>
+            <TableHead>Open</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {jobs.map((job) => (
+            <TableRow key={job.job_id}>
+              <TableCell>{job.filename || "Unnamed upload"}</TableCell>
+              <TableCell>
+                <StatusBadge status={job.status} />
+              </TableCell>
+              <TableCell className="font-mono text-xs text-[var(--color-mist)]">
+                {job.job_id}
+              </TableCell>
+              <TableCell>
+                <Link
+                  className="text-[var(--color-cyan)] underline-offset-4 hover:underline"
+                  href={`/jobs/${job.job_id}`}
+                >
+                  Open job
+                </Link>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Card>
   );
 }

@@ -4,6 +4,7 @@ import { PaginationNav } from "@/components/pagination-nav";
 import { SectionCard } from "@/components/section-card";
 import { SummaryCard } from "@/components/summary-card";
 import { TransactionsTable } from "@/components/transactions-table";
+import { Button } from "@/components/ui/button";
 import { type PaginationMeta, type Transaction } from "@/lib/api";
 import {
   getJobAnalysisSummaryServer,
@@ -86,9 +87,9 @@ export default async function TransactionsPage({
           <SummaryCard label="Needs category" value={uncategorizedCount} />
         </div>
         <div className="mt-5">
-          <Link className="button-secondary" href={`/jobs/${jobId}`}>
-            Back to job summary
-          </Link>
+          <Button asChild variant="secondary">
+            <Link href={`/jobs/${jobId}`}>Back to job summary</Link>
+          </Button>
         </div>
       </SectionCard>
 

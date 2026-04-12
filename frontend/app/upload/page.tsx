@@ -1,6 +1,7 @@
 import { SectionCard } from "@/components/section-card";
 import { UploadForm } from "@/components/upload-form";
 import { requireCurrentUser } from "@/lib/server-auth";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default async function UploadPage() {
   await requireCurrentUser();
@@ -40,30 +41,36 @@ export default async function UploadPage() {
           className="h-full"
         >
           <div className="grid gap-3">
-            <div className="rounded-[1.25rem] border border-white/8 bg-white/4 px-4 py-4">
+            <Card className="rounded-[1.25rem] bg-white/4">
+              <CardContent className="px-4 py-4">
               <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--color-mist)]">
                 File type
               </p>
               <p className="mt-2 text-sm font-medium text-white">
                 Single PDF statement
               </p>
-            </div>
-            <div className="rounded-[1.25rem] border border-white/8 bg-white/4 px-4 py-4">
+              </CardContent>
+            </Card>
+            <Card className="rounded-[1.25rem] bg-white/4">
+              <CardContent className="px-4 py-4">
               <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--color-mist)]">
                 Next screen
               </p>
               <p className="mt-2 text-sm font-medium text-white">
                 Job status workspace
               </p>
-            </div>
-            <div className="rounded-[1.25rem] border border-white/8 bg-white/4 px-4 py-4">
+              </CardContent>
+            </Card>
+            <Card className="rounded-[1.25rem] bg-white/4">
+              <CardContent className="px-4 py-4">
               <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--color-mist)]">
                 Processing
               </p>
               <p className="mt-2 text-sm font-medium text-white">
                 Pending, extracting, categorizing, completed
               </p>
-            </div>
+              </CardContent>
+            </Card>
           </div>
         </SectionCard>
       </section>
