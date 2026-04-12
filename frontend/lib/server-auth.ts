@@ -1,10 +1,14 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import {
+  type AnalysisSummary,
   getApiBaseUrl,
   type AuthResponse,
+  type CategoryBreakdownResponse,
   type JobDetail,
+  type JobAnalysisSummary,
   type JobListResponse,
+  type SpendingTrendResponse,
   type TransactionsResponse,
 } from "@/lib/api";
 
@@ -116,14 +120,41 @@ export async function redirectIfAuthenticated() {
   }
 }
 
-export async function getJobsServer() {
-  return serverApiFetch<JobListResponse>("/jobs");
+export async function getJobsServer(page = 1, limit = 20) {
+  return serverApiFetch<JobListResponse>(`/jobs?page=${page}&limit=${limit}`);
 }
 
 export async function getJobServer(jobId: string) {
   return serverApiFetch<JobDetail>(`/jobs/${jobId}`);
 }
 
-export async function getTransactionsServer(jobId: string) {
-  return serverApiFetch<TransactionsResponse>(`/transactions/${jobId}`);
+export async function getTransactionsServer(jobId: string, page = 1, limit = 50) {
+  return serverApiFetch<TransactionsResponse>(
+    `/transactions/${jobId}?page=${page}&limit=${limit}`,
+  );
+}
+
+export async function getAnalysisSummaryServer() {
+  return serverApiFetch<AnalysisSummary>("/analysis/summary");
+}
+
+export async function getSpendingTrendServer(
+  groupBy: "day" | "week" | "month" = "day",
+) {
+  return serverApiFetch<SpendingTrendResponse>(
+    `/analysis/spending-trend?group_by=${groupBy}`,
+  );
+}
+
+export async function getCategoryBreakdownServer(
+  type: "expense" | "income" | "all" = "expense",
+  limit = 5,
+) {
+  return serverApiFetch<CategoryBreakdownResponse>(
+    `/analysis/categories?type=${type}&limit=${limit}`,
+  );
+}
+
+export async function getJobAnalysisSummaryServer(jobId: string) {
+  return serverApiFetch<JobAnalysisSummary>(`/analysis/jobs/${jobId}/summary`);
 }

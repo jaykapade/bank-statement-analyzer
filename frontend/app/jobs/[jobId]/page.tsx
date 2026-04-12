@@ -8,14 +8,14 @@ import { SummaryCard } from "@/components/summary-card";
 import { TransactionsTable } from "@/components/transactions-table";
 import {
   getApiBaseUrl,
-  type JobDetail,
+  type JobAnalysisSummary,
   type Transaction,
 } from "@/lib/api";
 import {
-  getJobServer,
-  serverApiText,
+  getJobAnalysisSummaryServer,
   getTransactionsServer,
   requireCurrentUser,
+  serverApiText,
 } from "@/lib/server-auth";
 
 type JobDetailPageProps = {
@@ -33,17 +33,25 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
   await requireCurrentUser();
 
   const { jobId } = await params;
-  let job: JobDetail | null = null;
+  let job: JobAnalysisSummary | null = null;
   let transactions: Transaction[] = [];
   let markdownPreview: string | null = null;
   let error: string | null = null;
 
   try {
     const [jobResponse, transactionsResponse] = await Promise.all([
-      getJobServer(jobId),
+      getJobAnalysisSummaryServer(jobId),
       getTransactionsServer(jobId).catch(() => ({
         job_id: jobId,
         transactions: [],
+        pagination: {
+          page: 1,
+          limit: 50,
+          total: 0,
+          total_pages: 1,
+          has_next: false,
+          has_prev: false,
+        },
       })),
     ]);
 
@@ -61,10 +69,6 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
   } catch {
   }
 
-  const transactionTotal = transactions.reduce(
-    (sum, transaction) => sum + transaction.amount,
-    0,
-  );
   const markdownLineCount = markdownPreview
     ? markdownPreview.split(/\r?\n/).length
     : 0;
@@ -106,10 +110,10 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
               </div>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <SummaryCard label="Total rows" value={job.total} />
-                <SummaryCard label="Categorized" value={job.done} />
-                <SummaryCard label="Pending" value={job.pending} />
-                <SummaryCard label="Needs retry" value={job.failed} />
+                <SummaryCard label="Total rows" value={job.category_counts.total} />
+                <SummaryCard label="Categorized" value={job.category_counts.done} />
+                <SummaryCard label="Pending" value={job.category_counts.pending} />
+                <SummaryCard label="Needs retry" value={job.category_counts.failed} />
               </div>
 
               <div className="mt-5 flex flex-wrap gap-3">
@@ -133,10 +137,13 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
           body="Transaction totals from the extracted rows."
         >
           <div className="grid gap-3 sm:grid-cols-1">
-            <SummaryCard label="Visible rows" value={transactions.length} />
             <SummaryCard
-              label="Amount total"
-              value={formatAmount(transactionTotal)}
+              label="Rows extracted"
+              value={job?.transaction_summary.count ?? transactions.length}
+            />
+            <SummaryCard
+              label="Net flow"
+              value={formatAmount(job?.transaction_summary.net_flow ?? 0)}
               valueClassName="text-[clamp(1.5rem,2.2vw,2rem)]"
             />
           </div>
@@ -154,7 +161,7 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
 
       <SectionCard
         title="Transaction table"
-        body="All extracted transactions for this job."
+        body="A preview of extracted transactions for this job."
       >
         <TransactionsTable transactions={transactions} />
       </SectionCard>
