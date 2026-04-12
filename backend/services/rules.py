@@ -6,26 +6,31 @@ Only transactions that don't match any rule are forwarded to the LLM.
 
 Rule matching:
 - Case-insensitive substring match on the transaction description
-- First matching rule wins (rules ordered from most specific → most general)
-- Returns (matched, unmatched) — matched items have a "category" key added
+- First matching rule wins (rules ordered from most specific -> most general)
+- Returns (matched, unmatched) -> matched items have a "category" key added
 """
 
 import re
 from logger import logger
 
+
 # ---------------------------------------------------------------------------
-# Category Rules
-# Each rule: {"keywords": [...], "patterns": [...], "category": str}
-# At least one of keywords/patterns is required.
-# keywords: case-insensitive substring match
-# patterns: case-insensitive regex match
+# Canonical category config
+# This is the single source of truth for:
+# - LLM-facing category definitions/examples
+# - Rules-based matching keywords/patterns
 # ---------------------------------------------------------------------------
-RULES: list[dict] = [
-    # -----------------------------------------------------------------------
-    # FOOD
-    # -----------------------------------------------------------------------
-    {
-        "category": "Food",
+CATEGORY_CONFIG: dict[str, dict[str, list[str]]] = {
+    "Food": {
+        "examples": [
+            "restaurants",
+            "cafes",
+            "food delivery",
+            "grocery stores",
+            "supermarkets",
+            "bakeries",
+            "juice bars",
+        ],
         "keywords": [
             "swiggy",
             "zomato",
@@ -58,19 +63,24 @@ RULES: list[dict] = [
             "behrouz",
             "ovenstory",
             "wendy",
-            # common generic food tokens
             "restaurant",
             "bakery",
             "dhaba",
             "canteen",
             "juice bar",
         ],
+        "patterns": [],
     },
-    # -----------------------------------------------------------------------
-    # HEALTH
-    # -----------------------------------------------------------------------
-    {
-        "category": "Health",
+    "Health": {
+        "examples": [
+            "hospitals",
+            "pharmacies",
+            "chemists",
+            "medical stores",
+            "clinics",
+            "diagnostics",
+            "fitness",
+        ],
         "keywords": [
             "apollo",
             "medplus",
@@ -95,7 +105,6 @@ RULES: list[dict] = [
             "cult.fit",
             "cure.fit",
             "fitpass",
-            # generic
             "pharmacy",
             "chemist",
             "medical store",
@@ -104,12 +113,19 @@ RULES: list[dict] = [
             "clinic",
             "nursing home",
         ],
+        "patterns": [],
     },
-    # -----------------------------------------------------------------------
-    # TRAVEL
-    # -----------------------------------------------------------------------
-    {
-        "category": "Travel",
+    "Travel": {
+        "examples": [
+            "airlines",
+            "trains",
+            "bus tickets",
+            "taxis",
+            "hotels",
+            "fuel stations",
+            "tolls",
+            "travel agencies",
+        ],
         "keywords": [
             "irctc",
             "redbus",
@@ -158,11 +174,16 @@ RULES: list[dict] = [
             r"bus\s*ticket",
         ],
     },
-    # -----------------------------------------------------------------------
-    # SHOPPING
-    # -----------------------------------------------------------------------
-    {
-        "category": "Shopping",
+    "Shopping": {
+        "examples": [
+            "retail stores",
+            "e-commerce",
+            "clothing",
+            "electronics",
+            "department stores",
+            "home goods",
+            "general merchandise",
+        ],
         "keywords": [
             "amazon",
             "flipkart",
@@ -201,14 +222,19 @@ RULES: list[dict] = [
             "zara",
             "h&m",
         ],
+        "patterns": [],
     },
-    # -----------------------------------------------------------------------
-    # BILLS (subscriptions, utilities, insurance, telecom, loan payments)
-    # -----------------------------------------------------------------------
-    {
-        "category": "Bills",
+    "Bills": {
+        "examples": [
+            "utility bills",
+            "phone or internet recharge",
+            "insurance premiums",
+            "loan EMI",
+            "credit card bill payments",
+            "subscription services",
+            "broadband",
+        ],
         "keywords": [
-            # Streaming / subscriptions
             "netflix",
             "spotify",
             "prime video",
@@ -223,7 +249,6 @@ RULES: list[dict] = [
             "tinder",
             "bumble",
             "linkedin premium",
-            # Telecom
             "airtel",
             "jio",
             "vi ",
@@ -233,7 +258,6 @@ RULES: list[dict] = [
             "act fibernet",
             "hathway",
             "tikona",
-            # Utilities
             "electricity",
             "bescom",
             "mseb",
@@ -248,7 +272,6 @@ RULES: list[dict] = [
             "mahanagargas",
             "igl",
             "atgl",
-            # Insurance
             "insurance",
             "lic",
             "hdfc life",
@@ -259,12 +282,10 @@ RULES: list[dict] = [
             "niva bupa",
             "max bupa",
             "new india assurance",
-            # Loan / EMI
             "emi",
             "loan repayment",
             "ecs debit",
             "nach debit",
-            # Generic
             "bill payment",
             "recharge",
             "broadband",
@@ -276,11 +297,15 @@ RULES: list[dict] = [
             r"credit\s*card\s*(payment|bill|due)",
         ],
     },
-    # -----------------------------------------------------------------------
-    # OTHER  (wallets, bank fees, transfers — catch-all, keep last)
-    # -----------------------------------------------------------------------
-    {
-        "category": "Other",
+    "Other": {
+        "examples": [
+            "payment wallets where purpose is unclear",
+            "bank fees",
+            "interest charges",
+            "transfers",
+            "cash withdrawals",
+            "unknown merchants",
+        ],
         "keywords": [
             "paytm",
             "phonepe",
@@ -302,7 +327,33 @@ RULES: list[dict] = [
             "imps",
             "upi",
         ],
+        "patterns": [],
     },
+}
+
+
+CATEGORY_DEFINITIONS: dict[str, list[str]] = {
+    category: config["examples"] for category, config in CATEGORY_CONFIG.items()
+}
+
+
+def build_category_prompt_block() -> str:
+    return "\n".join(
+        f"- {category}: {', '.join(config['examples'])}"
+        for category, config in CATEGORY_CONFIG.items()
+    )
+
+
+# ---------------------------------------------------------------------------
+# Compatibility view for existing rule-based matcher shape
+# ---------------------------------------------------------------------------
+RULES: list[dict] = [
+    {
+        "category": category,
+        "keywords": config["keywords"],
+        "patterns": config["patterns"],
+    }
+    for category, config in CATEGORY_CONFIG.items()
 ]
 
 
@@ -358,8 +409,8 @@ def rules_categorize(transactions: list[dict]) -> tuple[list[dict], list[dict]]:
     Matched transactions gain a "category" key.
 
     Returns:
-        matched   — transactions with category assigned by rules
-        unmatched — transactions that need LLM categorization
+        matched   -> transactions with category assigned by rules
+        unmatched -> transactions that need LLM categorization
     """
     matched: list[dict] = []
     unmatched: list[dict] = []

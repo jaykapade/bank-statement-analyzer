@@ -3,6 +3,7 @@ import json
 import re
 from logger import logger
 from config import settings
+from services.rules import CATEGORY_DEFINITIONS, build_category_prompt_block
 
 
 # -----------------------------
@@ -220,7 +221,23 @@ Rules:
 - IGNORE: any amount that appears in running/paragraph text (not inside a proper table row) without both a date AND a serial/transaction number. For example, standalone amounts like "61,165.81", "1,33,291.53", "1,39,471.36" are statement-level totals — skip them entirely.
 - IGNORE: any table that shows hypothetical or illustrative examples — these include "Interest calculation", "Minimum Amount Due Calculation", "Late Payment Charges Calculation", or any table with headings like "SL. No", "Transaction", containing example purchases/fees used to illustrate bank policy
 - IGNORE: EMI / Personal Loan summary tables showing installment schedules, not actual transactions
-- For amounts: strip currency symbols (₹, $, £, €) and commas. If a statement uses separate debit/credit columns, use negative numbers for debits and positive for credits. "CR" suffix means credit (positive).
+- For amounts: strip currency symbols (₹, $, £, €) and commas. The sign is critical — NEVER return all amounts as positive.
+- Debit/outflow/spend rules:
+  - Debit column populated -> negative
+  - Withdrawal / purchase / charge / fee / cash advance / ATM / POS / DR / debit -> negative
+  - On credit-card statements, card spends, charges, fees, finance charges, EMI debits, and cash withdrawals are negative
+- Credit/inflow/refund rules:
+  - Credit column populated -> positive
+  - Deposit / salary / refund / reversal / cashback / interest credited / payment received / CR / credit -> positive
+  - On credit-card statements, card bill payments, refunds, reversals, and cashback are positive
+- If a row has separate debit and credit columns, exactly one populated column determines the sign. Ignore blank/zero column values.
+- If the statement shows a suffix/prefix such as CR, DR, CREDIT, DEBIT, +, or -, preserve that direction in the numeric amount.
+- Do not infer sign from running balance. Use the transaction row's debit/credit indicators only.
+- Good examples:
+  - "Amazon Purchase | Debit 1,250.00" -> amount -1250.00
+  - "Salary Credit | Credit 52,000.00" -> amount 52000.00
+  - "Card Payment Received | CR 8,000.00" -> amount 8000.00
+  - "ATM Withdrawal | DR 2,000.00" -> amount -2000.00
 - Normalize all dates to YYYY-MM-DD format regardless of input format (e.g. 01 Jan 2024, 2024/01/01, 01-01-24)
 - If description is unclear, use the closest readable text from that row
 - Return an empty array [] if no valid transactions are found in this portion
@@ -271,6 +288,32 @@ def extract_transactions(markdown: str):
 # -----------------------------
 # Normalize Data
 # -----------------------------
+NEGATIVE_DESCRIPTION_PATTERNS = [
+    re.compile(r"\b(?:igst|cgst|sgst|utgst|gst)\b", re.IGNORECASE),
+    re.compile(r"\bgst\s*(?:charge|fee|tax)?\b", re.IGNORECASE),
+    re.compile(r"\btax(?:es)?\b", re.IGNORECASE),
+]
+
+
+def apply_amount_sign_heuristics(description: str, amount: float) -> float:
+    """
+    Correct common LLM sign mistakes using strong description cues.
+
+    We keep this intentionally conservative and only flip signs for patterns
+    that are overwhelmingly debit/outflow in statements.
+    """
+    if amount > 0:
+        for pattern in NEGATIVE_DESCRIPTION_PATTERNS:
+            if pattern.search(description):
+                logger.info(
+                    f"[LLM] Flipping amount to negative based on description cue: "
+                    f"{description!r} ({amount})"
+                )
+                return -abs(amount)
+
+    return amount
+
+
 def normalize_transactions(transactions: list):
     """
     Cleans and normalizes each transaction from LLM output.
@@ -309,6 +352,7 @@ def normalize_transactions(transactions: list):
         description = (
             str(raw_desc).strip() if raw_desc not in (None, "", "None") else "unknown"
         )
+        amount = apply_amount_sign_heuristics(description, amount)
 
         normalized.append({"date": date, "description": description, "amount": amount})
 
@@ -318,22 +362,26 @@ def normalize_transactions(transactions: list):
 # -----------------------------
 # Categorize Transactions
 # -----------------------------
+_CATEGORY_NAMES = list(CATEGORY_DEFINITIONS.keys())
+_CATEGORY_PROMPT_BLOCK = build_category_prompt_block()
+
 CATEGORIZE_PROMPT_TEMPLATE = """
-Categorize each transaction into exactly one of: Food, Shopping, Travel, Bills, Health, Other
+Categorize each transaction into exactly one of: {category_names}
 
 Category definitions:
-- Food: restaurants, cafes, food delivery (Swiggy, Zomato, Domino's), grocery stores, supermarkets, bakeries, juice bars
-- Shopping: retail stores, e-commerce (Amazon, Flipkart, Myntra), clothing, electronics, D-Mart, departmental stores
-- Travel: airlines, trains, bus tickets (RedBus, IRCTC), taxis (Ola, Uber), hotels, fuel stations, toll, travel agencies
-- Bills: utility bills (electricity, water, gas), phone/internet recharge, insurance premiums, loan EMI, credit card payments, subscription services (Netflix, Spotify, Tinder)
-- Health: hospitals, pharmacies, chemists, medical stores, clinics, fitness, diagnostics
-- Other: payment wallets (Paytm, PhonePe, GPay) where purpose is unclear, bank fees, interest charges, unknown merchants, transfers
+{category_definitions}
 
 Rules:
 - Return the "id" field exactly as given. Do not modify, omit, or generate new IDs.
-- Use only these categories: Food, Shopping, Travel, Bills, Health, Other
+- Use only these categories: {category_names}
 - When in doubt between two categories, prefer the more specific one (e.g. pharmacy → Health, not Other)
 - Subscriptions and recurring online services → Bills
+- Credit card bill payments, utility payments, recharge, insurance, and EMI/NACH/ECS debits -> Bills
+- Wallet rails like Paytm, PhonePe, GPay, UPI, bank transfer, NEFT, IMPS, RTGS, or generic transfer descriptions -> Other unless the merchant purpose is explicitly clear
+- Use amount sign as supporting context only:
+  - Negative amounts are usually spending/outflow
+  - Positive amounts are usually salary, refund, reversal, cashback, payment receipt, or transfer-in
+  - Do not classify purely by sign if the merchant clearly indicates a better category
 
 Return ONLY a valid JSON array, no explanation, no markdown code fences:
 [
@@ -368,7 +416,11 @@ def categorize_transactions(transactions: list):
         logger.info(
             f"[LLM] Categorizing batch {i + 1}/{len(batches)} ({len(batch)} transactions)"
         )
-        prompt = CATEGORIZE_PROMPT_TEMPLATE.format(batch=json.dumps(batch))
+        prompt = CATEGORIZE_PROMPT_TEMPLATE.format(
+            category_names=", ".join(_CATEGORY_NAMES),
+            category_definitions=_CATEGORY_PROMPT_BLOCK,
+            batch=json.dumps(batch),
+        )
         result = call_with_retry(prompt)
 
         if result is None:

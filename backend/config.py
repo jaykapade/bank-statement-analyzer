@@ -82,6 +82,15 @@ class Settings(BaseSettings):
     # Retry attempts on empty/unparseable LLM output
     llm_retry_attempts: int = 2
 
+    # ── Analysis Cache ───────────────────────────────────────────────────────
+    # TTL (seconds) for user-level aggregation endpoints (summary, trend, categories).
+    # These are invalidated immediately when a job completes, so 5 min is fine.
+    cache_ttl_analysis: int = 5 * 60
+
+    # TTL (seconds) for per-job summary once the job is in a terminal state.
+    # Completed job data is immutable so we can cache it much longer.
+    cache_ttl_job_summary: int = 60 * 60
+
 
 # Single shared instance — import this everywhere.
 settings = Settings()

@@ -118,5 +118,6 @@ backend/
 - [ ] **Docker Setup:** Finalize `Dockerfile` and `docker-compose.yml` to orchestrate API, worker, Redis, DB, and MinIO.
 - [ ] **Production Database:** Replace SQLite with PostgreSQL for production deployments.
 - [ ] **Dashboard Endpoints:** Aggregated reporting endpoints (spending by category, income vs. expenses, date ranges).
+- [ ] **CRUD Endpoints:** CRUD operations for transactions and jobs.
 - [ ] **Error Handling & Validation:** Standardize error responses and add request-level input validation.
 - [ ] **Unit & Integration Tests:** `pytest` coverage for auth flows, job endpoints, and background tasks.

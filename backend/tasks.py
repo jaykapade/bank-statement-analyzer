@@ -1,7 +1,7 @@
 from db import SessionLocal
 import uuid
 from logger import setup_logger
-from models import Job, Transaction, CategoryStatus
+from models import Job, Transaction, CategoryStatus, JobStatus
 from services.llm import extract_transactions, categorize_transactions
 from services.rules import rules_categorize
 from services.pdf import extract_markdown
@@ -9,6 +9,7 @@ import tempfile
 import os
 from storage import s3, get_markdown_object_key
 from config import settings
+from cache import invalidate_user_cache
 
 logger = setup_logger("worker")
 
@@ -133,6 +134,9 @@ def process_pdf(object_key: str, job_id: str):
         if transactions is None:
             update_job_status(session, job_id, "extract_failed")
             session.commit()
+            job_row = session.query(Job).filter(Job.job_id == job_id).first()
+            if job_row:
+                invalidate_user_cache(job_row.user_id)
             return
 
         # STEP 3: Save Transactions
@@ -171,6 +175,9 @@ def process_pdf(object_key: str, job_id: str):
             if not rule_results:
                 update_job_status(session, job_id, "categorize_failed")
                 session.commit()
+                job_row = session.query(Job).filter(Job.job_id == job_id).first()
+                if job_row:
+                    invalidate_user_cache(job_row.user_id)
                 return
             logger.warning(
                 "[Worker] LLM categorization failed; applying rule results only"
@@ -190,6 +197,7 @@ def process_pdf(object_key: str, job_id: str):
             .first()
         )
 
+        job_row = session.query(Job).filter(Job.job_id == job_id).first()
         if remaining_failed:
             update_job_status(session, job_id, "categorize_failed")
         else:
@@ -197,6 +205,8 @@ def process_pdf(object_key: str, job_id: str):
 
         session.commit()
 
+        if job_row:
+            invalidate_user_cache(job_row.user_id)
         logger.info(f"[Worker] Completed {job_id}")
 
     except Exception as e:
@@ -208,6 +218,9 @@ def process_pdf(object_key: str, job_id: str):
         try:
             update_job_status(fail_session, job_id, "failed")
             fail_session.commit()
+            job_row = fail_session.query(Job).filter(Job.job_id == job_id).first()
+            if job_row:
+                invalidate_user_cache(job_row.user_id)
         finally:
             fail_session.close()
 
@@ -292,6 +305,7 @@ def retry_categorization(job_id: str):
             .first()
         )
 
+        job_row = session.query(Job).filter(Job.job_id == job_id).first()
         if remaining_failed:
             update_job_status(session, job_id, "categorize_failed")
         else:
@@ -299,6 +313,8 @@ def retry_categorization(job_id: str):
 
         session.commit()
 
+        if job_row:
+            invalidate_user_cache(job_row.user_id)
         logger.info(f"[Worker] Retry completed for {job_id}")
 
     except Exception as e:
@@ -309,6 +325,9 @@ def retry_categorization(job_id: str):
         try:
             update_job_status(fail_session, job_id, "failed")
             fail_session.commit()
+            job_row = fail_session.query(Job).filter(Job.job_id == job_id).first()
+            if job_row:
+                invalidate_user_cache(job_row.user_id)
         finally:
             fail_session.close()
 
