@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { ErrorToast } from "@/components/error-toast";
-import { PaginationNav } from "@/components/pagination-nav";
 import { SectionCard } from "@/components/section-card";
 import { SummaryCard } from "@/components/summary-card";
 import { TransactionsTable } from "@/components/transactions-table";
@@ -97,10 +96,9 @@ export default async function TransactionsPage({
         <SectionCard title="Transactions unavailable" body="Try returning to the job summary and opening this table again." />
       ) : (
         <>
-          <TransactionsTable transactions={transactions} />
-          <PaginationNav
+          <TransactionsTable
+            transactions={transactions}
             buildHref={(nextPage) => `/jobs/${jobId}/transactions?page=${nextPage}`}
-            label="transactions"
             pagination={pagination}
           />
         </>

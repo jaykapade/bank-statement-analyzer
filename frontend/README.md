@@ -78,9 +78,9 @@ frontend/
 - [x] **Summary Overview:** Key metrics (total income, total expenses, net savings).
 - [x] **Transaction Table:** Sortable, filterable transactions per job.
 - [x] **Interactive Charts:** Spending by category, income vs. expenses.
+- [x] **Pagination:** Server-side pagination for large transaction sets.
+- [x] **Dockerization:** Multi-stage `Dockerfile` and `docker-compose` integration with the backend.
 
 ### Planned
 - [ ] **Protected Route Middleware:** Auto-redirect unauthenticated users to `/login` via Next.js middleware.
 - [ ] **Manual Transaction Corrections:** Allow users to override AI-assigned categories inline.
-- [ ] **Pagination:** Server-side pagination for large transaction sets.
-- [ ] **Dockerization:** Multi-stage `Dockerfile` and `docker-compose` integration with the backend.

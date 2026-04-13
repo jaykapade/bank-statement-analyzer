@@ -1,6 +1,6 @@
-import type { Transaction } from "@/lib/api";
+import type { PaginationMeta, Transaction } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -9,6 +9,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 function formatCurrency(amount: number) {
   const formatted = new Intl.NumberFormat("en-US", {
@@ -20,8 +27,12 @@ function formatCurrency(amount: number) {
 
 export function TransactionsTable({
   transactions,
+  pagination,
+  buildHref,
 }: {
   transactions: Transaction[];
+  pagination?: PaginationMeta;
+  buildHref?: (page: number) => string;
 }) {
   if (transactions.length === 0) {
     return (
@@ -32,6 +43,11 @@ export function TransactionsTable({
       </Card>
     );
   }
+
+  const start = pagination ? (pagination.page - 1) * pagination.limit + 1 : 1;
+  const end = pagination
+    ? Math.min(pagination.page * pagination.limit, pagination.total)
+    : transactions.length;
 
   return (
     <Card className="overflow-hidden rounded-[1.5rem] bg-white/4">
@@ -46,7 +62,9 @@ export function TransactionsTable({
         </TableHeader>
         <TableBody>
           {transactions.map((transaction, index) => (
-            <TableRow key={`${transaction.date}-${transaction.description}-${index}`}>
+            <TableRow
+              key={`${transaction.date}-${transaction.description}-${index}`}
+            >
               <TableCell>{transaction.date}</TableCell>
               <TableCell>{transaction.description}</TableCell>
               <TableCell>{transaction.category || "Uncategorized"}</TableCell>
@@ -62,6 +80,46 @@ export function TransactionsTable({
           ))}
         </TableBody>
       </Table>
+      {pagination && buildHref ? (
+        <CardFooter className="flex flex-col gap-3 border-t border-white/10 px-4 py-4 text-sm text-[var(--color-mist)] sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            Showing {start}-{end} of {pagination.total} transactions
+          </p>
+          <Pagination className="mx-0 w-auto justify-start sm:justify-end">
+            <PaginationContent>
+              <PaginationItem>
+                {pagination.has_prev ? (
+                  <PaginationPrevious
+                    href={buildHref(pagination.page - 1)}
+                    size="default"
+                  />
+                ) : (
+                  <span className="inline-flex h-10 items-center rounded-xl border border-white/10 px-3 text-white/40">
+                    Previous
+                  </span>
+                )}
+              </PaginationItem>
+              <PaginationItem>
+                <span className="inline-flex h-10 items-center rounded-xl border border-white/10 px-4 font-mono text-xs text-white">
+                  Page {pagination.page} of {pagination.total_pages}
+                </span>
+              </PaginationItem>
+              <PaginationItem>
+                {pagination.has_next ? (
+                  <PaginationNext
+                    href={buildHref(pagination.page + 1)}
+                    size="default"
+                  />
+                ) : (
+                  <span className="inline-flex h-10 items-center rounded-xl border border-white/10 px-3 text-white/40">
+                    Next
+                  </span>
+                )}
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </CardFooter>
+      ) : null}
     </Card>
   );
 }

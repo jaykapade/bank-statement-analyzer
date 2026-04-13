@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   getApiBaseUrl,
   type JobAnalysisSummary,
+  type PaginationMeta,
   type Transaction,
 } from "@/lib/api";
 import {
@@ -22,6 +23,7 @@ import {
 
 type JobDetailPageProps = {
   params: Promise<{ jobId: string }>;
+  searchParams?: Promise<{ page?: string }>;
 };
 
 function formatAmount(value: number) {
@@ -31,23 +33,41 @@ function formatAmount(value: number) {
   }).format(value);
 }
 
-export default async function JobDetailPage({ params }: JobDetailPageProps) {
+function parsePage(value: string | undefined) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+}
+
+export default async function JobDetailPage({
+  params,
+  searchParams,
+}: JobDetailPageProps) {
   await requireCurrentUser();
 
   const { jobId } = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const page = parsePage(resolvedSearchParams?.page);
   let job: JobAnalysisSummary | null = null;
   let transactions: Transaction[] = [];
+  let pagination: PaginationMeta = {
+    page,
+    limit: 50,
+    total: 0,
+    total_pages: 1,
+    has_next: false,
+    has_prev: false,
+  };
   let markdownPreview: string | null = null;
   let error: string | null = null;
 
   try {
     const [jobResponse, transactionsResponse] = await Promise.all([
       getJobAnalysisSummaryServer(jobId),
-      getTransactionsServer(jobId).catch(() => ({
+      getTransactionsServer(jobId, page, 50).catch(() => ({
         job_id: jobId,
         transactions: [],
         pagination: {
-          page: 1,
+          page,
           limit: 50,
           total: 0,
           total_pages: 1,
@@ -59,6 +79,7 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
 
     job = jobResponse;
     transactions = transactionsResponse.transactions;
+    pagination = transactionsResponse.pagination;
   } catch (caughtError) {
     error =
       caughtError instanceof Error
@@ -164,7 +185,11 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
         title="Transaction table"
         body="A preview of extracted transactions for this job."
       >
-        <TransactionsTable transactions={transactions} />
+        <TransactionsTable
+          transactions={transactions}
+          pagination={pagination}
+          buildHref={(nextPage) => `/jobs/${jobId}?page=${nextPage}`}
+        />
       </SectionCard>
     </div>
   );
