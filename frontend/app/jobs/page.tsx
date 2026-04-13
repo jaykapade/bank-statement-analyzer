@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { ErrorToast } from "@/components/error-toast";
 import { JobsTable } from "@/components/jobs-table";
-import { PaginationNav } from "@/components/pagination-nav";
 import { SectionCard } from "@/components/section-card";
 import { SummaryCard } from "@/components/summary-card";
 import { type JobListItem, type PaginationMeta } from "@/lib/api";
@@ -78,10 +77,9 @@ export default async function JobsPage({ searchParams }: JobsPageProps) {
         </SectionCard>
       ) : (
         <>
-          <JobsTable jobs={jobs} />
-          <PaginationNav
+          <JobsTable
+            jobs={jobs}
             buildHref={(nextPage) => `/jobs?page=${nextPage}`}
-            label="jobs"
             pagination={pagination}
           />
         </>
