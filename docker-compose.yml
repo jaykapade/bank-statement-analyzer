@@ -6,6 +6,17 @@ services:
     ports:
       - "6379:6379"
 
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=finance
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
   minio:
     image: minio/minio
     ports:
@@ -20,7 +31,7 @@ services:
 
   backend:
     build: ./backend
-    command: fastapi dev main.py --host 0.0.0.0 --port 8000
+    command: sh -c "alembic upgrade head && fastapi dev main.py --host 0.0.0.0 --port 8000"
     volumes:
       - ./backend:/app
     ports:
@@ -28,7 +39,9 @@ services:
     depends_on:
       - redis
       - minio
+      - postgres
     environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/finance
       - REDIS_HOST=redis
       - MINIO_ENDPOINT=minio:9000
       - MINIO_ACCESS_KEY=minioadmin
@@ -43,7 +56,9 @@ services:
     depends_on:
       - redis
       - minio
+      - postgres
     environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/finance
       - REDIS_HOST=redis
       - MINIO_ENDPOINT=minio:9000
       - MINIO_ACCESS_KEY=minioadmin
@@ -62,3 +77,4 @@ services:
 
 volumes:
   minio_data:
+  postgres_data:

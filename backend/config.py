@@ -27,8 +27,7 @@ class Settings(BaseSettings):
     )
 
     # ── Database ────────────────────────────────────────────────────────────
-    database_url: str = "sqlite:///./finance.db"
-    # For PostgreSQL: "postgresql://user:password@localhost:5432/finance"
+    database_url: str = "postgresql://postgres:password@localhost:5432/finance"
     # Set DB_ECHO=true in .env.local to log every SQL statement (very noisy!)
     db_echo: bool = False
 
