@@ -4,6 +4,7 @@ docling==2.84.0
 fastapi==0.135.2
 fastapi-cli==0.0.24
 httpx==0.28.1
+psycopg2-binary>=2.9.11
 pydantic==2.12.5
 pydantic-settings==2.13.1
 python-multipart==0.0.22
