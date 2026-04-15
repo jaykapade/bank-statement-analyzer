@@ -110,6 +110,7 @@ backend/
 - **Dashboard Endpoints:** Aggregated reporting endpoints (spending by category, income vs. expenses, date ranges).
 - **Docker Setup:** Finalize `Dockerfile` and `docker-compose.yml` to orchestrate API, worker, Redis, DB, and MinIO.
 - **Production Database:** Add PostgreSQL for production grade database.
+- **CRUD Endpoints:** CRUD operations for transactions and jobs.
 
 ---
 
@@ -118,6 +119,5 @@ backend/
 > Planned improvements toward production-readiness.
 
 - [ ] **S3 Garbage Collection:** Background task to prune S3 objects with no matching job record.
-- [ ] **CRUD Endpoints:** CRUD operations for transactions and jobs.
 - [ ] **Error Handling & Validation:** Standardize error responses and add request-level input validation.
 - [ ] **Unit & Integration Tests:** `pytest` coverage for auth flows, job endpoints, and background tasks.

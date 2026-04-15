@@ -80,7 +80,7 @@ frontend/
 - [x] **Interactive Charts:** Spending by category, income vs. expenses.
 - [x] **Pagination:** Server-side pagination for large transaction sets.
 - [x] **Dockerization:** Multi-stage `Dockerfile` and `docker-compose` integration with the backend.
+- [x] **Manual Transaction Corrections:** Allow users to override AI-assigned categories inline.
 
 ### Planned
 - [ ] **Protected Route Middleware:** Auto-redirect unauthenticated users to `/login` via Next.js middleware.
-- [ ] **Manual Transaction Corrections:** Allow users to override AI-assigned categories inline.

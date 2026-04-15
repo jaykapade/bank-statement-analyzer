@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ErrorToast } from "@/components/error-toast";
 import { RetryCategorizationButton } from "@/components/retry-categorization-button";
+import { DeleteJobButton } from "@/components/delete-job-button";
 import { JobDebugDialogs } from "@/components/job-debug-dialogs";
 import { SectionCard } from "@/components/section-card";
 import { StatusBadge } from "@/components/status-badge";
@@ -149,6 +150,7 @@ export default async function JobDetailPage({
                 <Button asChild variant="secondary">
                   <Link href="/jobs">Back to jobs</Link>
                 </Button>
+                <DeleteJobButton jobId={jobId} />
               </div>
             </>
           )}
@@ -188,7 +190,7 @@ export default async function JobDetailPage({
         <TransactionsTable
           transactions={transactions}
           pagination={pagination}
-          buildHref={(nextPage) => `/jobs/${jobId}?page=${nextPage}`}
+          pageHrefPrefix={`/jobs/${jobId}?page=`}
         />
       </SectionCard>
     </div>
