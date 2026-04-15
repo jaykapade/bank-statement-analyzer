@@ -130,7 +130,7 @@ export async function getJobServer(jobId: string) {
 
 export async function getTransactionsServer(jobId: string, page = 1, limit = 50) {
   return serverApiFetch<TransactionsResponse>(
-    `/transactions/${jobId}?page=${page}&limit=${limit}`,
+    `/jobs/${jobId}/transactions?page=${page}&limit=${limit}`,
   );
 }
 

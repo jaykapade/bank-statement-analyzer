@@ -97,8 +97,10 @@ export default async function TransactionsPage({
       ) : (
         <>
           <TransactionsTable
+            editable
+            jobId={jobId}
             transactions={transactions}
-            buildHref={(nextPage) => `/jobs/${jobId}/transactions?page=${nextPage}`}
+            pageHrefPrefix={`/jobs/${jobId}/transactions?page=`}
             pagination={pagination}
           />
         </>
