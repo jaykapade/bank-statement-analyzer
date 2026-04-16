@@ -1,4 +1,13 @@
-from sqlalchemy import Column, String, Enum, Float, ForeignKey, DateTime, MetaData
+from sqlalchemy import (
+    Column,
+    String,
+    Enum,
+    Numeric,
+    ForeignKey,
+    DateTime,
+    MetaData,
+    func,
+)
 from sqlalchemy.orm import declarative_base
 import enum
 
@@ -49,6 +58,17 @@ class Job(Base):
     filename = Column(String)
     status = Column(Enum(JobStatus), default=JobStatus.pending)
     s3_url = Column(String)
+    created_at = Column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
 
 
 # -----------------------------
@@ -62,10 +82,21 @@ class Transaction(Base):
 
     date = Column(String)
     description = Column(String)
-    amount = Column(Float)
+    amount = Column(Numeric(18, 2))
 
     category = Column(String, nullable=True)
     category_status = Column(Enum(CategoryStatus), default=CategoryStatus.pending)
+    created_at = Column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
 
 
 # -----------------------------

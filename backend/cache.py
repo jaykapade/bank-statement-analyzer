@@ -68,12 +68,9 @@ def set_cached(key: str, data: Any, *, ttl: int = TTL_ANALYSIS, user_id: str | N
             tracking_set = _user_keys_set(user_id)
             _redis.sadd(tracking_set, key)
             # Keep tracking-set TTL at least as long as the longest tracked key.
-            # Without this, writing a short-lived key after a long-lived key
-            # can shrink the set TTL and make future invalidation miss keys.
+            # Use Redis-side GT guard to avoid racy read-then-write TTL updates.
             desired_ttl = ttl + 60
-            current_ttl = _redis.ttl(tracking_set)
-            if current_ttl in (-2, -1) or current_ttl < desired_ttl:
-                _redis.expire(tracking_set, desired_ttl)
+            _redis.expire(tracking_set, desired_ttl, gt=True)
 
     except Exception as exc:
         logger.warning(f"[Cache] SET failed for key={key!r}: {exc}")

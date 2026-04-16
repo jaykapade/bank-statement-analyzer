@@ -8,7 +8,7 @@ Next.js 16 frontend for the Bank Statement Analyzer. Provides authentication, PD
 |---|---|
 | Framework | [Next.js 14](https://nextjs.org/) (App Router) |
 | Language | TypeScript |
-| Styling | Vanilla CSS (custom design system, dark mode) |
+| Styling | Tailwind CSS & Shadcn UI Components |
 | Notifications | [Sonner](https://sonner.emilkowalski.dev/) |
 | Icons | [Lucide React](https://lucide.dev/) |
 | Package Manager | pnpm |
@@ -75,12 +75,14 @@ frontend/
 - [x] **Open in New Tab:** Direct link to raw PDF or markdown asset.
 
 ### Dashboard & Data Visualization ✅
-- [x] **Summary Overview:** Key metrics (total income, total expenses, net savings).
-- [x] **Transaction Table:** Sortable, filterable transactions per job.
-- [x] **Interactive Charts:** Spending by category, income vs. expenses.
-- [x] **Pagination:** Server-side pagination for large transaction sets.
+- [x] **Summary Overview:** Key metrics (total income, total expenses, net savings) powered by optimized, parallel backend endpoints.
+- [x] **Data Tables:** Sortable, filterable lists for both jobs and transactions utilizing reusable Shadcn UI components.
+- [x] **Interactive Charts:** Spending by category and income vs. expenses visualizations.
+- [x] **Pagination:** Server-side pagination for large transaction sets to ensure performance.
+- [x] **Data Management (CRUD):** Full Create, Read, Update, and Delete capabilities for jobs and transactions.
+- [x] **Manual Corrections:** Allow users to seamlessly override AI-assigned categories inline.
+- [x] **Reset Functionality:** Quick action button to safely clear all tracking data for the authenticated user.
 - [x] **Dockerization:** Multi-stage `Dockerfile` and `docker-compose` integration with the backend.
-- [x] **Manual Transaction Corrections:** Allow users to override AI-assigned categories inline.
 
 ### Planned
 - [ ] **Protected Route Middleware:** Auto-redirect unauthenticated users to `/login` via Next.js middleware.

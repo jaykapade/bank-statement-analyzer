@@ -1,5 +1,6 @@
 from db import SessionLocal
 import uuid
+from datetime import datetime
 from logger import setup_logger
 from models import Job, Transaction, CategoryStatus, JobStatus
 from services.llm import extract_transactions, categorize_transactions
@@ -19,6 +20,13 @@ logger = setup_logger("worker")
 # -----------------------------
 def generate_transaction_id():
     return str(uuid.uuid4())
+
+
+def get_job_or_none(session, job_id: str, task_name: str):
+    job = session.query(Job).filter(Job.job_id == job_id).first()
+    if not job:
+        logger.warning(f"[{task_name}] Job not found, skipping. job_id={job_id}")
+    return job
 
 
 # -----------------------------
@@ -67,6 +75,7 @@ def update_categories(session, job_id, categorized):
                 {
                     "category": category,
                     "category_status": CategoryStatus.done,
+                    "updated_at": datetime.utcnow(),
                 },
                 synchronize_session=False,
             )
@@ -80,7 +89,10 @@ def update_categories(session, job_id, categorized):
         Transaction.job_id == job_id,
         Transaction.category_status == CategoryStatus.pending,
     ).update(
-        {"category_status": CategoryStatus.failed},
+        {
+            "category_status": CategoryStatus.failed,
+            "updated_at": datetime.utcnow(),
+        },
         synchronize_session=False,
     )
 
@@ -90,7 +102,7 @@ def update_categories(session, job_id, categorized):
 # -----------------------------
 def update_job_status(session, job_id, status):
     session.query(Job).filter(Job.job_id == job_id).update(
-        {"status": status},
+        {"status": status, "updated_at": datetime.utcnow()},
         synchronize_session=False,
     )
 
@@ -106,11 +118,16 @@ def process_pdf(object_key: str, job_id: str):
     file_path = os.path.join(temp_dir, os.path.basename(object_key))
 
     try:
+        if not get_job_or_none(session, job_id, "process_pdf"):
+            return
+
         logger.info(f"[Worker] Downloading {object_key} to {file_path}")
         s3.download_file(settings.bucket_name, object_key, file_path)
         logger.info(f"[Worker] Downloaded {object_key} to {file_path}")
 
         # ✅ STEP 0: mark extracting
+        if not get_job_or_none(session, job_id, "process_pdf"):
+            return
         update_job_status(session, job_id, "extracting")
         session.commit()
 
@@ -132,6 +149,8 @@ def process_pdf(object_key: str, job_id: str):
 
         # ❌ only true failure
         if transactions is None:
+            if not get_job_or_none(session, job_id, "process_pdf"):
+                return
             update_job_status(session, job_id, "extract_failed")
             session.commit()
             job_row = session.query(Job).filter(Job.job_id == job_id).first()
@@ -140,9 +159,13 @@ def process_pdf(object_key: str, job_id: str):
             return
 
         # STEP 3: Save Transactions
+        if not get_job_or_none(session, job_id, "process_pdf"):
+            return
         save_transactions(session, job_id, transactions)
 
         # ✅ move to categorizing stage
+        if not get_job_or_none(session, job_id, "process_pdf"):
+            return
         update_job_status(session, job_id, "categorizing")
         session.commit()  # partial commit
 
@@ -173,6 +196,8 @@ def process_pdf(object_key: str, job_id: str):
         # ❌ only true failure — but if rules caught some, partial results are still useful
         if categorized is None:
             if not rule_results:
+                if not get_job_or_none(session, job_id, "process_pdf"):
+                    return
                 update_job_status(session, job_id, "categorize_failed")
                 session.commit()
                 job_row = session.query(Job).filter(Job.job_id == job_id).first()
@@ -198,6 +223,11 @@ def process_pdf(object_key: str, job_id: str):
         )
 
         job_row = session.query(Job).filter(Job.job_id == job_id).first()
+        if not job_row:
+            logger.warning(
+                f"[process_pdf] Job deleted before final status update. job_id={job_id}"
+            )
+            return
         if remaining_failed:
             update_job_status(session, job_id, "categorize_failed")
         else:
@@ -216,6 +246,8 @@ def process_pdf(object_key: str, job_id: str):
         # fresh session for failure update
         fail_session = SessionLocal()
         try:
+            if not get_job_or_none(fail_session, job_id, "process_pdf"):
+                return
             update_job_status(fail_session, job_id, "failed")
             fail_session.commit()
             job_row = fail_session.query(Job).filter(Job.job_id == job_id).first()
@@ -242,6 +274,9 @@ def retry_categorization(job_id: str):
     session = SessionLocal()
 
     try:
+        if not get_job_or_none(session, job_id, "retry_categorization"):
+            return
+
         # STEP 1: fetch pending + failed
         rows = (
             session.query(Transaction)
@@ -255,11 +290,15 @@ def retry_categorization(job_id: str):
         )
 
         if not rows:
+            if not get_job_or_none(session, job_id, "retry_categorization"):
+                return
             update_job_status(session, job_id, "completed")
             session.commit()
             return
 
         # STEP 2: mark categorizing
+        if not get_job_or_none(session, job_id, "retry_categorization"):
+            return
         update_job_status(session, job_id, "categorizing")
         session.commit()
 
@@ -284,6 +323,8 @@ def retry_categorization(job_id: str):
 
         if categorized is None:
             if not rule_results:
+                if not get_job_or_none(session, job_id, "retry_categorization"):
+                    return
                 update_job_status(session, job_id, "categorize_failed")
                 session.commit()
                 return
@@ -306,6 +347,12 @@ def retry_categorization(job_id: str):
         )
 
         job_row = session.query(Job).filter(Job.job_id == job_id).first()
+        if not job_row:
+            logger.warning(
+                f"[retry_categorization] Job deleted before final status update. "
+                f"job_id={job_id}"
+            )
+            return
         if remaining_failed:
             update_job_status(session, job_id, "categorize_failed")
         else:
@@ -323,6 +370,8 @@ def retry_categorization(job_id: str):
 
         fail_session = SessionLocal()
         try:
+            if not get_job_or_none(fail_session, job_id, "retry_categorization"):
+                return
             update_job_status(fail_session, job_id, "failed")
             fail_session.commit()
             job_row = fail_session.query(Job).filter(Job.job_id == job_id).first()

@@ -1,5 +1,6 @@
 import io
 import uuid
+from decimal import Decimal, ROUND_HALF_UP
 
 from botocore.exceptions import ClientError
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -38,7 +39,7 @@ class JobUpdateRequest(BaseModel):
 class TransactionCreateRequest(BaseModel):
     date: str = Field(min_length=1, max_length=64)
     description: str = Field(min_length=1, max_length=512)
-    amount: float
+    amount: Decimal
     category: str | None = Field(default=None, max_length=255)
     category_status: CategoryStatus = CategoryStatus.pending
 
@@ -48,7 +49,7 @@ class TransactionUpdateRequest(BaseModel):
 
     date: str | None = Field(default=None, min_length=1, max_length=64)
     description: str | None = Field(default=None, min_length=1, max_length=512)
-    amount: float | None = None
+    amount: Decimal | None = None
     category: str | None = Field(default=None, max_length=255)
     category_status: CategoryStatus | None = None
 
@@ -105,6 +106,13 @@ def read_s3_bytes_or_404(object_key: str) -> bytes:
         body.close()
 
 
+def serialize_amount(amount: Decimal | float | int | None) -> float | None:
+    if amount is None:
+        return None
+    dec = Decimal(str(amount)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return float(dec)
+
+
 def ensure_markdown_bytes(job: Job) -> bytes:
     """
     Read the pre-generated markdown artifact from S3.
@@ -138,7 +146,7 @@ def get_jobs(
         base_q = (
             session.query(Job)
             .filter(Job.user_id == current_user.id)
-            .order_by(Job.job_id.desc())
+            .order_by(Job.updated_at.desc(), Job.created_at.desc(), Job.job_id.desc())
         )
         total = base_q.count()
         jobs = base_q.offset((page - 1) * limit).limit(limit).all()
@@ -266,6 +274,7 @@ def update_job(
 
         session.commit()
         invalidate_user_cache(current_user.id)
+        invalidate_job_summary_cache(job_id)
         return {
             "job_id": job.job_id,
             "status": job.status,
@@ -335,7 +344,14 @@ def _get_transactions_page(
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
 
-        base_q = session.query(Transaction).filter(Transaction.job_id == job_id)
+        base_q = (
+            session.query(Transaction)
+            .filter(Transaction.job_id == job_id)
+            .order_by(
+                Transaction.created_at.asc(),
+                Transaction.id.asc(),
+            )
+        )
         total = base_q.count()
         transactions = base_q.offset((page - 1) * limit).limit(limit).all()
         total_pages = max(1, (total + limit - 1) // limit)
@@ -345,7 +361,7 @@ def _get_transactions_page(
             "transactions": [
                 {
                     "id": t.id,
-                    "amount": t.amount,
+                    "amount": serialize_amount(t.amount),
                     "category": t.category,
                     "category_status": t.category_status,
                     "description": t.description,
@@ -412,7 +428,7 @@ def create_transaction(
         return {
             "id": transaction.id,
             "job_id": transaction.job_id,
-            "amount": transaction.amount,
+            "amount": serialize_amount(transaction.amount),
             "category": transaction.category,
             "category_status": transaction.category_status,
             "description": transaction.description,
@@ -447,7 +463,7 @@ def update_transaction(
         return {
             "id": transaction.id,
             "job_id": transaction.job_id,
-            "amount": transaction.amount,
+            "amount": serialize_amount(transaction.amount),
             "category": transaction.category,
             "category_status": transaction.category_status,
             "description": transaction.description,
@@ -472,7 +488,11 @@ def delete_transaction(
         session.commit()
         invalidate_user_cache(current_user.id)
         invalidate_job_summary_cache(job_id)
-        return {"message": "Transaction deleted", "id": transaction_id, "job_id": job_id}
+        return {
+            "message": "Transaction deleted",
+            "id": transaction_id,
+            "job_id": job_id,
+        }
     finally:
         session.close()
 

@@ -1,6 +1,7 @@
 import httpx
 import json
 import re
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from logger import logger
 from config import settings
 from services.rules import CATEGORY_DEFINITIONS, build_category_prompt_block
@@ -295,7 +296,7 @@ NEGATIVE_DESCRIPTION_PATTERNS = [
 ]
 
 
-def apply_amount_sign_heuristics(description: str, amount: float) -> float:
+def apply_amount_sign_heuristics(description: str, amount: Decimal) -> Decimal:
     """
     Correct common LLM sign mistakes using strong description cues.
 
@@ -342,8 +343,11 @@ def normalize_transactions(transactions: list):
             logger.warning(f"Skipping transaction with no amount: {t}")
             continue
         try:
-            amount = float(raw_amount)
-        except (ValueError, TypeError):
+            amount = Decimal(str(raw_amount).replace(",", "")).quantize(
+                Decimal("0.01"),
+                rounding=ROUND_HALF_UP,
+            )
+        except (InvalidOperation, ValueError, TypeError):
             logger.warning(f"Skipping transaction with unparseable amount: {t}")
             continue
 
