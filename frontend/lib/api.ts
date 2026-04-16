@@ -38,8 +38,10 @@ export type JobDetail = {
 };
 
 export type Transaction = {
+  id: string;
   amount: number;
   category: string | null;
+  category_status: "pending" | "done" | "failed";
   description: string;
   date: string;
 };
@@ -162,7 +164,84 @@ export async function getJob(jobId: string) {
 
 export async function getTransactions(jobId: string, page = 1, limit = 50) {
   return apiFetch<TransactionsResponse>(
-    `/transactions/${jobId}?page=${page}&limit=${limit}`,
+    `/jobs/${jobId}/transactions?page=${page}&limit=${limit}`,
+  );
+}
+
+export async function createJob(filename: string | null = null) {
+  return apiFetch<JobListItem>("/jobs", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ filename }),
+  });
+}
+
+export async function updateJob(
+  jobId: string,
+  payload: Partial<Pick<JobListItem, "filename" | "status">>,
+) {
+  return apiFetch<JobListItem>(`/jobs/${jobId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteJob(jobId: string) {
+  return apiFetch<{ message: string; job_id: string; deleted_transactions: number }>(
+    `/jobs/${jobId}`,
+    {
+      method: "DELETE",
+    },
+  );
+}
+
+export type CreateTransactionPayload = {
+  date: string;
+  description: string;
+  amount: number;
+  category?: string | null;
+  category_status?: "pending" | "done" | "failed";
+};
+
+export async function createTransaction(jobId: string, payload: CreateTransactionPayload) {
+  return apiFetch<Transaction>(`/jobs/${jobId}/transactions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export type UpdateTransactionPayload = Partial<
+  Pick<Transaction, "date" | "description" | "amount" | "category" | "category_status">
+>;
+
+export async function updateTransaction(
+  jobId: string,
+  transactionId: string,
+  payload: UpdateTransactionPayload,
+) {
+  return apiFetch<Transaction>(`/jobs/${jobId}/transactions/${transactionId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteTransaction(jobId: string, transactionId: string) {
+  return apiFetch<{ message: string; id: string; job_id: string }>(
+    `/jobs/${jobId}/transactions/${transactionId}`,
+    {
+      method: "DELETE",
+    },
   );
 }
 

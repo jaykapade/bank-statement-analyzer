@@ -79,7 +79,7 @@ export default async function JobsPage({ searchParams }: JobsPageProps) {
         <>
           <JobsTable
             jobs={jobs}
-            buildHref={(nextPage) => `/jobs?page=${nextPage}`}
+            pageHrefPrefix="/jobs?page="
             pagination={pagination}
           />
         </>

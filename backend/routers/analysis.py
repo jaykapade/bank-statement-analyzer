@@ -19,6 +19,7 @@ stores ISO-8601 strings). No date filter → all-time data.
 """
 
 from datetime import date
+from decimal import Decimal, ROUND_HALF_UP
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -28,6 +29,12 @@ from cache import TTL_ANALYSIS, TTL_JOB_SUMMARY, get_cached, set_cached
 from models import CategoryStatus, Job, JobStatus, Transaction, User
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
+ZERO = Decimal("0")
+
+
+def money(value: Decimal | float | int) -> float:
+    dec = Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return float(dec)
 
 
 # ---------------------------------------------------------------------------
@@ -120,14 +127,20 @@ def analysis_summary(
 
     transactions = base_q.all()
 
-    total_income = sum(t.amount for t in transactions if t.amount > 0)
-    total_expenses = sum(abs(t.amount) for t in transactions if t.amount < 0)
+    total_income = sum(
+        (t.amount for t in transactions if t.amount > 0),
+        start=ZERO,
+    )
+    total_expenses = sum(
+        (abs(t.amount) for t in transactions if t.amount < 0),
+        start=ZERO,
+    )
     uncategorized = sum(1 for t in transactions if not t.category)
 
     result = {
-        "total_income": round(total_income, 2),
-        "total_expenses": round(total_expenses, 2),
-        "net_flow": round(total_income - total_expenses, 2),
+        "total_income": money(total_income),
+        "total_expenses": money(total_expenses),
+        "net_flow": money(total_income - total_expenses),
         "transaction_count": len(transactions),
         "uncategorized_count": uncategorized,
         "date_range": {
@@ -175,7 +188,7 @@ def analysis_spending_trend(
     from collections import defaultdict
 
     buckets: dict[str, dict] = defaultdict(
-        lambda: {"income": 0.0, "expenses": 0.0, "sort_key": ""}
+        lambda: {"income": ZERO, "expenses": ZERO, "sort_key": ""}
     )
 
     for t in transactions:
@@ -208,8 +221,8 @@ def analysis_spending_trend(
     trend = [
         {
             "period": label,
-            "income": round(v["income"], 2),
-            "expenses": round(v["expenses"], 2),
+            "income": money(v["income"]),
+            "expenses": money(v["expenses"]),
         }
         for label, v in sorted(buckets.items(), key=lambda kv: kv[1]["sort_key"])
     ]
@@ -261,7 +274,7 @@ def analysis_categories(
 
     from collections import defaultdict
 
-    totals: dict[str, dict] = defaultdict(lambda: {"amount": 0.0, "count": 0})
+    totals: dict[str, dict] = defaultdict(lambda: {"amount": ZERO, "count": 0})
     for t in transactions:
         cat = t.category or "Uncategorized"
         totals[cat]["amount"] += abs(t.amount)
@@ -273,7 +286,7 @@ def analysis_categories(
 
     result = {
         "categories": [
-            {"name": name, "amount": round(v["amount"], 2), "count": v["count"]}
+            {"name": name, "amount": money(v["amount"]), "count": v["count"]}
             for name, v in categories
         ],
         "type": type,
@@ -332,8 +345,8 @@ def analysis_job_summary(
         db.query(Transaction.amount).filter(Transaction.job_id == job_id).all()
     )
     amounts = [r.amount for r in transactions]
-    total_income = sum(a for a in amounts if a > 0)
-    total_expenses = sum(abs(a) for a in amounts if a < 0)
+    total_income = sum((a for a in amounts if a > 0), start=ZERO)
+    total_expenses = sum((abs(a) for a in amounts if a < 0), start=ZERO)
 
     # Embed user_id in the stored payload for ownership check on cache hit
     result_with_uid = {
@@ -344,9 +357,9 @@ def analysis_job_summary(
         "category_counts": category_counts,
         "transaction_summary": {
             "count": len(amounts),
-            "total_income": round(total_income, 2),
-            "total_expenses": round(total_expenses, 2),
-            "net_flow": round(total_income - total_expenses, 2),
+            "total_income": money(total_income),
+            "total_expenses": money(total_expenses),
+            "net_flow": money(total_income - total_expenses),
         },
     }
 

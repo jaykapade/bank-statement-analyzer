@@ -75,26 +75,45 @@ backend/
 | `POST` | `/auth/logout` | Destroys session, clears cookie |
 | `GET`  | `/auth/me` | Returns the current authenticated user |
 
-### Jobs
+### Upload
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/upload` | Upload a PDF bank statement |
-| `GET`  | `/jobs` | List all jobs for the current user |
+
+### Jobs
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET`  | `/jobs` | List paginated jobs for the current user |
+| `POST` | `/jobs` | Create a new job manually |
 | `GET`  | `/jobs/{job_id}` | Get job status and metadata |
+| `PATCH`| `/jobs/{job_id}` | Update job metadata (e.g., filename, status) |
+| `DELETE`| `/jobs/{job_id}`| Delete a job and its associated transactions |
+| `GET`  | `/categorize/retry/{job_id}` | Re-run LLM categorization on a job |
 | `GET`  | `/jobs/{job_id}/assets/pdf` | Stream the original uploaded PDF |
 | `GET`  | `/jobs/{job_id}/assets/markdown` | Stream the extracted markdown artifact |
 
 ### Transactions
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET`  | `/transactions/{job_id}` | Get all transactions for a job |
-| `GET`  | `/categorize/retry/{job_id}` | Re-run LLM categorization on a job |
+| `GET`  | `/jobs/{job_id}/transactions`| Get paginated transactions for a job |
+| `POST` | `/jobs/{job_id}/transactions`| Create a new transaction manually |
+| `PATCH`| `/jobs/{job_id}/transactions/{transaction_id}` | Update an existing transaction |
+| `DELETE`| `/jobs/{job_id}/transactions/{transaction_id}` | Delete a specific transaction |
+| `GET`  | `/transactions/{job_id}` | Get transactions for a job (Legacy) |
 
-### Admin
+### Analysis
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/reset` | Delete all jobs and transactions for the current user |
-| `GET`  | `/health` | Health check |
+| `GET`  | `/analysis/summary` | Global summary metrics (income, expenses, savings) |
+| `GET`  | `/analysis/spending-trend` | Time-series data of spending trends |
+| `GET`  | `/analysis/categories` | Breakdown of spending by category |
+| `GET`  | `/analysis/jobs/{job_id}/summary`| Summary metrics for a specific job |
+
+### System / Admin
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/admin/reset` | Delete all jobs and transactions for the current user |
+| `GET`  | `/healthy` | Health check |
 
 ---
 
@@ -103,13 +122,14 @@ backend/
 - **Cookie-based Auth:** Secure HTTP-only session cookies with bcrypt password hashing and SHA-256 token storage. All job/transaction endpoints are scoped to the authenticated user.
 - **Alembic Migrations:** Full migration history including the `users` and `sessions` tables with SQLAlchemy `MetaData` naming conventions for reliable constraint names.
 - **S3 Object Storage (MinIO):** S3-compatible storage for uploads, with automatic bucket initialization, per-worker temporary file cleanup, and markdown artifact upload post-processing.
-- **Rules-Based Pre-Categorization:** `services/rules.py` deterministically categorizes well-known merchants before sending remaining transactions to the LLM, reducing latency and API cost.
+- **Rules-Based Pre-Categorization:** `services/rules.py` utilizes a structured configuration format to deterministically categorize well-known merchants before sending remaining transactions to the LLM, reducing latency and API costs.
 - **PDF & Markdown Asset Endpoints:** `/jobs/{id}/assets/pdf` and `/jobs/{id}/assets/markdown` stream job assets directly from S3 with ownership checks.
 - **30-Minute RQ Timeout:** Extended job timeout for large PDFs processed by slow local LLMs.
-- **Config Management:** Migrate to `pydantic-settings` for env-based config instead of scattered `os.getenv` calls.
-- **Dashboard Endpoints:** Aggregated reporting endpoints (spending by category, income vs. expenses, date ranges).
-- **Docker Setup:** Finalize `Dockerfile` and `docker-compose.yml` to orchestrate API, worker, Redis, DB, and MinIO.
-- **Production Database:** Add PostgreSQL for production grade database.
+- **Config Management:** Migrated to `pydantic-settings` for type-safe, centralized, and environment-based configuration management.
+- **Dashboard Endpoints:** Aggregated reporting endpoints (spending by category, income vs. expenses, date ranges) optimized with user-specific caching and automatic invalidation on data changes.
+- **Docker Setup:** Orchestrates API, worker, Redis, DB, and MinIO via `docker-compose.yml`, including reliable container-to-host networking for local Ollama instances.
+- **Production Database:** Migrated from SQLite to PostgreSQL for production-ready persistence and robust concurrent access.
+- **Data Management (CRUD):** Comprehensive endpoints for full Create, Read, Update, and Delete operations on Jobs and Transactions.
 
 ---
 
@@ -118,6 +138,5 @@ backend/
 > Planned improvements toward production-readiness.
 
 - [ ] **S3 Garbage Collection:** Background task to prune S3 objects with no matching job record.
-- [ ] **CRUD Endpoints:** CRUD operations for transactions and jobs.
 - [ ] **Error Handling & Validation:** Standardize error responses and add request-level input validation.
 - [ ] **Unit & Integration Tests:** `pytest` coverage for auth flows, job endpoints, and background tasks.
