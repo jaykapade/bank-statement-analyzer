@@ -140,3 +140,11 @@ backend/
 - [ ] **S3 Garbage Collection:** Background task to prune S3 objects with no matching job record.
 - [ ] **Error Handling & Validation:** Standardize error responses and add request-level input validation.
 - [ ] **Unit & Integration Tests:** `pytest` coverage for auth flows, job endpoints, and background tasks.
+- [ ] **Chatbot API:** Expose a `/chat` endpoint that accepts natural-language queries and answers them using the user's full transaction history (e.g. "How much did I spend on groceries last month?").
+- [ ] **Vector Embeddings & AI-Ready Data:** Generate and persist vector embeddings for each transaction (description, category, amount, date) using a local embedding model (e.g. via Ollama `nomic-embed-text`), stored in a vector DB (pgvector / ChromaDB) to enable semantic search and RAG over transaction data.
+- [ ] **Per-Job Bank Statement Summary:** After categorization completes, auto-generate a concise natural-language summary for each job (total income, top expense categories, notable transactions, savings rate) and expose it via `/jobs/{job_id}/summary`.
+- [ ] **Export to CSV/Excel:** `GET /jobs/{job_id}/transactions/export` and `GET /transactions/export` endpoints that stream a CSV (or XLSX via `openpyxl`) of the user's transactions with all fields.
+- [ ] **Anomaly Detection:** Post-categorization background step that flags suspicious transactions — duplicates (same merchant + amount within N days), statistical outliers per category (Z-score / IQR), and sudden spending spikes — stored as a boolean `is_flagged` + `flag_reason` on the Transaction model.
+- [ ] **Spending Forecasting:** `GET /analysis/forecast` endpoint that uses linear regression (or exponential smoothing via `statsmodels`) on historical per-category monthly totals to predict next month's spend per category.
+- [ ] **Smart Budget Suggestions:** `GET /analysis/budget-suggestions` endpoint that sends the user's historical spending summary to the LLM and returns structured budget targets per category with justification.
+- [ ] **Multi-statement Trend Analysis:** `GET /analysis/trend` endpoint that aggregates income, expenses, and savings rate month-by-month across all jobs, enabling cross-statement comparisons.

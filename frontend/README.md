@@ -83,6 +83,14 @@ frontend/
 - [x] **Manual Corrections:** Allow users to seamlessly override AI-assigned categories inline.
 - [x] **Reset Functionality:** Quick action button to safely clear all tracking data for the authenticated user.
 - [x] **Dockerization:** Multi-stage `Dockerfile` and `docker-compose` integration with the backend.
+- [x] **Auto-tagging:** LLM automatically suggests and assigns transaction categories during processing.
 
 ### Planned
 - [ ] **Protected Route Middleware:** Auto-redirect unauthenticated users to `/login` via Next.js middleware.
+- [ ] **AI Chatbot UI:** Conversational chat interface (slide-over panel or dedicated `/chat` page) that lets users query their transactions in plain English, powered by the backend `/chat` endpoint.
+- [ ] **Per-Job Summary View:** Render the auto-generated natural-language summary for each bank statement on the job detail page, alongside key metrics (income, top categories, savings rate).
+- [ ] **Export to CSV/Excel:** Download button on the transactions table to export the current job's (or all) transactions as a `.csv` or `.xlsx` file.
+- [ ] **Anomaly Detection UI:** Highlight flagged transactions in the transaction table with a warning badge; include a dedicated "Flagged" filter tab and a tooltip showing the flag reason.
+- [ ] **Spending Forecast Dashboard:** New dashboard card showing next month's predicted spend per category as a bar chart, with a confidence indicator.
+- [ ] **Smart Budget Suggestions Panel:** A recommendations panel (sidebar or modal) displaying LLM-generated budget targets per category with accept/dismiss actions.
+- [ ] **Multi-statement Trend Chart:** Line chart on the dashboard showing income, expenses, and savings rate month-by-month across all uploaded statements.
