@@ -475,18 +475,29 @@ def garbage_collect_s3_orphans(
     Delete S3 PDF/markdown artifacts that are no longer referenced by any Job.
 
     Safety:
+    - Upload-vs-GC race: a worker can upload "<key>.pdf" (and markdown) before
+      Job.s3_url is committed. If GC runs in that window, an orphaned-yet-soon-
+      to-be-referenced key could be considered for deletion.
+    - Current protection is operational: keep min_age_hours at its conservative
+      default (24) so fresh uploads are not touched during this race window.
+    - If maintainers change garbage_collect_s3_orphans defaults/usage, keep this
+      invariant documented in backend/README.md and preserve equivalent safety.
     - dry_run defaults to True.
     - only keys older than min_age_hours are considered.
     - only *.pdf and *.pdf.md objects are eligible for deletion.
     """
     session = SessionLocal()
     try:
-        jobs = session.query(Job).all()
         referenced_keys: set[str] = set()
-        for job in jobs:
-            if job.s3_url:
-                referenced_keys.add(job.s3_url)
-                referenced_keys.add(get_markdown_object_key(job.s3_url))
+        s3_url_rows = (
+            session.query(Job.s3_url)
+            .filter(Job.s3_url.isnot(None))
+            .yield_per(1000)
+        )
+        for (s3_url,) in s3_url_rows:
+            if s3_url:
+                referenced_keys.add(s3_url)
+                referenced_keys.add(get_markdown_object_key(s3_url))
     finally:
         session.close()
 
