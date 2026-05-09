@@ -7,18 +7,31 @@ FastAPI backend for the Bank Statement Analyzer. Handles PDF ingestion, LLM-powe
 | Layer | Technology |
 |---|---|
 | Web Framework | [FastAPI](https://fastapi.tiangolo.com/) |
-| Database | SQLite (dev) · SQLAlchemy ORM · Alembic migrations |
-| Auth | Cookie-based sessions (HTTP-only, SHA-256 token hashing, `bcrypt` passwords) |
+| Database | PostgreSQL · SQLAlchemy ORM · Alembic migrations |
+| Auth | Cookie-based sessions (HTTP-only, SHA-256 token hashing, PBKDF2 passwords) |
 | Background Jobs | [RQ](https://python-rq.org/) + Redis · `worker.py` |
 | Object Storage | MinIO (S3-compatible) via `boto3` |
 | PDF Extraction | [Docling](https://ds4sd.github.io/docling/) |
-| LLM Integration | Ollama (local) for transaction categorization |
+| LLM Integration | Ollama (local) — `deepseek-r1` for extraction & categorization |
+| Embeddings | Ollama `nomic-embed-text` — on-prem sentence embeddings |
+| Vector Store | [ChromaDB](https://www.trychroma.com/) (dedicated Docker service, HTTP client) |
 
 ---
 
 ## Local Development Setup
 
-Ensure **Redis**, **MinIO**, and **Ollama** are running before starting the server.
+Ensure **Redis**, **PostgreSQL**, **MinIO**, **ChromaDB**, and **Ollama** are running before starting the server.
+
+For local development the easiest way to spin up the infrastructure is:
+```bash
+docker compose -f docker-compose.infra.yml up
+```
+This starts Redis, PostgreSQL, MinIO, and ChromaDB — leaving the backend and worker to run natively.
+
+You will also need the Ollama embedding model:
+```bash
+ollama pull nomic-embed-text
+```
 
 1. **Install dependencies:**
    ```bash
@@ -55,12 +68,14 @@ backend/
 ├── tasks.py             # RQ background tasks (process_pdf, retry_categorization)
 ├── worker.py            # Custom RQ worker process
 ├── storage.py           # S3/MinIO client, bucket init, key helpers
+├── config.py            # Pydantic-settings config (env vars, defaults)
 ├── logger.py            # Logging configuration
 ├── alembic/             # Alembic migration environment and version scripts
 └── services/
-    ├── llm.py           # LLM integration for transaction categorization
+    ├── llm.py           # LLM integration: extraction & categorization prompts
     ├── pdf.py           # Docling PDF-to-markdown conversion
-    └── rules.py         # Rules-based pre-categorization (runs before LLM)
+    ├── rules.py         # Rules-based pre-categorization (runs before LLM)
+    └── embeddings.py    # Vector embeddings: ChromaDB client, upsert, search, delete
 ```
 
 ---
@@ -115,21 +130,28 @@ backend/
 | `POST` | `/admin/reset` | Delete all jobs and transactions for the current user |
 | `GET`  | `/healthy` | Health check |
 
+### Chat / RAG
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/chat` | Ask a natural-language question about your transactions; returns LLM answer + source transactions |
+
 ---
 
 ## Completed Features
 
-- **Cookie-based Auth:** Secure HTTP-only session cookies with bcrypt password hashing and SHA-256 token storage. All job/transaction endpoints are scoped to the authenticated user.
-- **Alembic Migrations:** Full migration history including the `users` and `sessions` tables with SQLAlchemy `MetaData` naming conventions for reliable constraint names.
-- **S3 Object Storage (MinIO):** S3-compatible storage for uploads, with automatic bucket initialization, per-worker temporary file cleanup, and markdown artifact upload post-processing.
-- **Rules-Based Pre-Categorization:** `services/rules.py` utilizes a structured configuration format to deterministically categorize well-known merchants before sending remaining transactions to the LLM, reducing latency and API costs.
-- **PDF & Markdown Asset Endpoints:** `/jobs/{id}/assets/pdf` and `/jobs/{id}/assets/markdown` stream job assets directly from S3 with ownership checks.
-- **30-Minute RQ Timeout:** Extended job timeout for large PDFs processed by slow local LLMs.
-- **Config Management:** Migrated to `pydantic-settings` for type-safe, centralized, and environment-based configuration management.
-- **Dashboard Endpoints:** Aggregated reporting endpoints (spending by category, income vs. expenses, date ranges) optimized with user-specific caching and automatic invalidation on data changes.
-- **Docker Setup:** Orchestrates API, worker, Redis, DB, and MinIO via `docker-compose.yml`, including reliable container-to-host networking for local Ollama instances.
-- **Production Database:** Migrated from SQLite to PostgreSQL for production-ready persistence and robust concurrent access.
-- **Data Management (CRUD):** Comprehensive endpoints for full Create, Read, Update, and Delete operations on Jobs and Transactions.
+- [x] **Cookie-based Auth:** Secure HTTP-only session cookies with PBKDF2 password hashing and SHA-256 token storage. All job/transaction endpoints are scoped to the authenticated user.
+- [x] **Alembic Migrations:** Full migration history including the `users` and `sessions` tables with SQLAlchemy `MetaData` naming conventions for reliable constraint names.
+- [x] **S3 Object Storage (MinIO):** S3-compatible storage for uploads, with automatic bucket initialization, per-worker temporary file cleanup, and markdown artifact upload post-processing.
+- [x] **Rules-Based Pre-Categorization:** `services/rules.py` utilizes a structured configuration format to deterministically categorize well-known merchants before sending remaining transactions to the LLM, reducing latency and API costs.
+- [x] **PDF & Markdown Asset Endpoints:** `/jobs/{id}/assets/pdf` and `/jobs/{id}/assets/markdown` stream job assets directly from S3 with ownership checks.
+- [x] **30-Minute RQ Timeout:** Extended job timeout for large PDFs processed by slow local LLMs.
+- [x] **Config Management:** Migrated to `pydantic-settings` for type-safe, centralized, and environment-based configuration management.
+- [x] **Dashboard Endpoints:** Aggregated reporting endpoints (spending by category, income vs. expenses, date ranges) optimized with user-specific caching and automatic invalidation on data changes.
+- [x] **Docker Setup:** `docker-compose.yml` orchestrates API, worker, Redis, PostgreSQL, MinIO, ChromaDB, and frontend. `docker-compose.infra.yml` provides infra-only setup for native local development.
+- [x] **Production Database:** Migrated from SQLite to PostgreSQL for production-ready persistence and robust concurrent access.
+- [x] **Data Management (CRUD):** Comprehensive endpoints for full Create, Read, Update, and Delete operations on Jobs and Transactions.
+- [x] **Vector Embeddings & RAG:** After each job completes, all transactions are embedded using Ollama `nomic-embed-text` and upserted into ChromaDB (HTTP service). Embeddings are user-scoped via metadata filtering. Deletions cascade — removing a job also removes its vectors.
+- [x] **AI Chatbot API:** `POST /chat` endpoint that embeds the user's question, retrieves the top-K semantically similar transactions from ChromaDB (RAG), builds a grounded prompt, calls the Ollama LLM, strips `<think>` reasoning artifacts, and returns `{ answer, sources }`.
 
 ---
 
@@ -140,8 +162,6 @@ backend/
 - [ ] **S3 Garbage Collection:** Background task to prune S3 objects with no matching job record.
 - [ ] **Error Handling & Validation:** Standardize error responses and add request-level input validation.
 - [ ] **Unit & Integration Tests:** `pytest` coverage for auth flows, job endpoints, and background tasks.
-- [ ] **Chatbot API:** Expose a `/chat` endpoint that accepts natural-language queries and answers them using the user's full transaction history (e.g. "How much did I spend on groceries last month?").
-- [ ] **Vector Embeddings & AI-Ready Data:** Generate and persist vector embeddings for each transaction (description, category, amount, date) using a local embedding model (e.g. via Ollama `nomic-embed-text`), stored in a vector DB (pgvector / ChromaDB) to enable semantic search and RAG over transaction data.
 - [ ] **Per-Job Bank Statement Summary:** After categorization completes, auto-generate a concise natural-language summary for each job (total income, top expense categories, notable transactions, savings rate) and expose it via `/jobs/{job_id}/summary`.
 - [ ] **Export to CSV/Excel:** `GET /jobs/{job_id}/transactions/export` and `GET /transactions/export` endpoints that stream a CSV (or XLSX via `openpyxl`) of the user's transactions with all fields.
 - [ ] **Anomaly Detection:** Post-categorization background step that flags suspicious transactions — duplicates (same merchant + amount within N days), statistical outliers per category (Z-score / IQR), and sudden spending spikes — stored as a boolean `is_flagged` + `flag_reason` on the Transaction model.

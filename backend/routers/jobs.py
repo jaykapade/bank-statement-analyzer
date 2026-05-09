@@ -315,6 +315,15 @@ def delete_job(job_id: str, current_user: User = Depends(get_current_user)):
                     f"Failed to delete S3 object {object_key} for job {job_id}: {exc}"
                 )
 
+    # Best effort cleanup for ChromaDB vectors
+    try:
+        from services.embeddings import delete_job_transactions as _delete_vecs
+        _delete_vecs(job_id)
+    except Exception as exc:
+        logger.warning(
+            f"Failed to delete ChromaDB vectors for job {job_id}: {exc}"
+        )
+
     return {
         "message": "Job deleted",
         "job_id": job_id,

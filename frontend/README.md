@@ -45,11 +45,12 @@ frontend/
 ├── components/
 │   ├── app-shell.tsx                 # Sidebar layout — auth-aware nav + user card
 │   ├── auth-form.tsx                 # Shared login/register form component
+│   ├── chat-panel.tsx                # Floating RAG chatbot panel (FAB + slide-up UI)
 │   ├── logout-button.tsx             # Client-side logout button
 │   ├── job-debug-dialogs.tsx         # PDF/markdown toggle viewer with copy support
 │   └── upload-form.tsx               # Drag-and-drop PDF upload form
 └── lib/
-    ├── api.ts                        # API client (apiFetch, auth helpers, types)
+    ├── api.ts                        # API client (apiFetch, auth helpers, chat types)
     └── server-auth.ts                # Server-side getCurrentUserServer (reads cookie)
 ```
 
@@ -60,6 +61,7 @@ frontend/
 ### Authentication ✅
 - [x] **User Registration & Login:** `/register` and `/login` pages with a shared `AuthForm` component.
 - [x] **Cookie-Based Sessions:** `credentials: "include"` on all fetches; HTTP-only session cookie set by the backend.
+- [x] **Protected Route Middleware:** Auto-redirects unauthenticated users to `/login` and authenticated users away from auth pages via Next.js `proxy.ts`.
 - [x] **Server-Side User Resolution:** `getCurrentUserServer()` in `server-auth.ts` reads the session cookie on the server and passes the user to `RootLayout`.
 - [x] **Auth-Aware Sidebar:** Shows user email + logout button when signed in; shows sign-in prompt and auth nav links when signed out.
 - [x] **Auth Route Layout:** Login/register pages render without the main nav shell.
@@ -85,9 +87,14 @@ frontend/
 - [x] **Dockerization:** Multi-stage `Dockerfile` and `docker-compose` integration with the backend.
 - [x] **Auto-tagging:** LLM automatically suggests and assigns transaction categories during processing.
 
+### AI Chatbot ✅
+- [x] **RAG Chat Panel:** Floating `✨` button (fixed bottom-right) opens a glassmorphism slide-up panel on every authenticated page.
+- [x] **Conversation UI:** User/assistant message bubbles, animated typing indicator, and per-message source tags showing the retrieved transactions (category + amount) that grounded the answer.
+- [x] **Suggestion Chips:** Four starter questions shown on empty state to guide first-time users.
+- [x] **Keyboard Support:** Enter to send, Shift+Enter for newline, send button enables/disables dynamically.
+- [x] **Error State:** Red error bubble if the backend embedding service or LLM is unavailable.
+
 ### Planned
-- [ ] **Protected Route Middleware:** Auto-redirect unauthenticated users to `/login` via Next.js middleware.
-- [ ] **AI Chatbot UI:** Conversational chat interface (slide-over panel or dedicated `/chat` page) that lets users query their transactions in plain English, powered by the backend `/chat` endpoint.
 - [ ] **Per-Job Summary View:** Render the auto-generated natural-language summary for each bank statement on the job detail page, alongside key metrics (income, top categories, savings rate).
 - [ ] **Export to CSV/Excel:** Download button on the transactions table to export the current job's (or all) transactions as a `.csv` or `.xlsx` file.
 - [ ] **Anomaly Detection UI:** Highlight flagged transactions in the transaction table with a warning badge; include a dedicated "Flagged" filter tab and a tooltip showing the flag reason.

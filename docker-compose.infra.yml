@@ -1,0 +1,65 @@
+# docker-compose.infra.yml
+#
+# Infra-only Compose file for LOCAL DEVELOPMENT.
+#
+# Starts the four backing services the app depends on:
+#   - PostgreSQL  (database)
+#   - Redis       (job queue broker)
+#   - MinIO       (S3-compatible object storage)
+#   - ChromaDB    (vector store for RAG chatbot)
+#
+# The backend API, RQ worker, and Next.js frontend are intentionally EXCLUDED
+# so they can be run natively (with hot-reload) outside of Docker:
+#
+#   docker compose -f docker-compose.infra.yml up   # start infra
+#   fastapi dev main.py                              # backend (separate terminal)
+#   python worker.py                                 # worker  (separate terminal)
+#   pnpm dev                                         # frontend (separate terminal)
+#
+# For a fully containerised stack (e.g. staging / CI), use docker-compose.yml instead.
+
+version: "3.9"
+
+services:
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=finance
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+
+  chromadb:
+    image: chromadb/chroma:latest
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+
+volumes:
+  minio_data:
+  postgres_data:
+  chroma_data:

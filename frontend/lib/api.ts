@@ -306,3 +306,26 @@ export async function resetAccount() {
     method: "POST",
   });
 }
+
+// ── Chat / RAG ────────────────────────────────────────────────────────────────
+
+export type ChatSource = {
+  id: string;
+  document: string;
+  date: string;
+  category: string;
+  amount: number;
+};
+
+export type ChatResponse = {
+  answer: string;
+  sources: ChatSource[];
+};
+
+export async function sendChatMessage(message: string): Promise<ChatResponse> {
+  return apiFetch<ChatResponse>("/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message }),
+  });
+}
