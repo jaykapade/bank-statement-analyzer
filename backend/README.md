@@ -55,6 +55,15 @@ ollama pull nomic-embed-text
    python worker.py
    ```
 
+5. **S3 garbage collector (safe dry-run by default):**
+   ```bash
+   python s3_gc_runner.py
+   ```
+   Apply deletions explicitly (defaults to 24 hours):
+   ```bash
+   python s3_gc_runner.py --apply --min-age-hours 24
+   ```
+
 ---
 
 ## Project Structure
@@ -152,6 +161,9 @@ backend/
 - [x] **Data Management (CRUD):** Comprehensive endpoints for full Create, Read, Update, and Delete operations on Jobs and Transactions.
 - [x] **Vector Embeddings & RAG:** After each job completes, all transactions are embedded using Ollama `nomic-embed-text` and upserted into ChromaDB (HTTP service). Embeddings are user-scoped via metadata filtering. Deletions cascade — removing a job also removes its vectors.
 - [x] **AI Chatbot API:** `POST /chat` endpoint that embeds the user's question, retrieves the top-K semantically similar transactions from ChromaDB (RAG), builds a grounded prompt, calls the Ollama LLM, strips `<think>` reasoning artifacts, and returns `{ answer, sources }`.
+- [x] **S3 Garbage Collection:** Cron-friendly runner (`s3_gc_runner.py`) with dry-run default, age guard, and orphan PDF/markdown cleanup.
+- [x] **Per-Job Bank Statement Summary:** After categorization completes, auto-generates a concise natural-language summary (with RAG support) for each job (total income, top expense categories, notable transactions) and saves it to the job record.
+- [x] **Export to CSV:** `GET /jobs/{job_id}/export/transactions.csv` and `GET /jobs/export/transactions.csv` endpoints that stream a CSV of the user's transactions.
 
 ---
 
@@ -159,7 +171,7 @@ backend/
 
 > Planned improvements toward production-readiness.
 
-- [ ] **S3 Garbage Collection:** Background task to prune S3 objects with no matching job record.
+- [x] **S3 Garbage Collection:** Cron-friendly runner (`s3_gc_runner.py`) with dry-run default, age guard, and orphan PDF/markdown cleanup.
 - [ ] **Error Handling & Validation:** Standardize error responses and add request-level input validation.
 - [ ] **Unit & Integration Tests:** `pytest` coverage for auth flows, job endpoints, and background tasks.
 - [ ] **Per-Job Bank Statement Summary:** After categorization completes, auto-generate a concise natural-language summary for each job (total income, top expense categories, notable transactions, savings rate) and expose it via `/jobs/{job_id}/summary`.

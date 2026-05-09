@@ -188,6 +188,7 @@ def search_transactions(
     query: str,
     user_id: str,
     top_k: int | None = None,
+    job_id: str | None = None,
 ) -> list[dict]:
     """
     Embed `query` and return the top-K most semantically similar transactions
@@ -213,10 +214,14 @@ def search_transactions(
         logger.error(f"[Embeddings] Failed to embed query: {e}")
         raise
 
+    where_filter: dict = {"user_id": user_id}
+    if job_id:
+        where_filter = {"$and": [{"user_id": user_id}, {"job_id": job_id}]}
+
     results = collection.query(
         query_embeddings=[query_vector],
         n_results=k,
-        where={"user_id": user_id},
+        where=where_filter,
         include=["documents", "metadatas", "distances"],
     )
 

@@ -94,9 +94,11 @@ frontend/
 - [x] **Keyboard Support:** Enter to send, Shift+Enter for newline, send button enables/disables dynamically.
 - [x] **Error State:** Red error bubble if the backend embedding service or LLM is unavailable.
 
+### Export & Summaries ✅
+- [x] **CSV Export:** Download buttons on both the global dashboard and per-job pages to export transactions to CSV.
+- [x] **Per-Job Summary View:** Renders an auto-generated natural-language summary (with RAG support) on the job detail page, alongside key metrics.
+
 ### Planned
-- [ ] **Per-Job Summary View:** Render the auto-generated natural-language summary for each bank statement on the job detail page, alongside key metrics (income, top categories, savings rate).
-- [ ] **Export to CSV/Excel:** Download button on the transactions table to export the current job's (or all) transactions as a `.csv` or `.xlsx` file.
 - [ ] **Anomaly Detection UI:** Highlight flagged transactions in the transaction table with a warning badge; include a dedicated "Flagged" filter tab and a tooltip showing the flag reason.
 - [ ] **Spending Forecast Dashboard:** New dashboard card showing next month's predicted spend per category as a bar chart, with a confidence indicator.
 - [ ] **Smart Budget Suggestions Panel:** A recommendations panel (sidebar or modal) displaying LLM-generated budget targets per category with accept/dismiss actions.

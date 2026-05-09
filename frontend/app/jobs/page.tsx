@@ -3,7 +3,7 @@ import { ErrorToast } from "@/components/error-toast";
 import { JobsTable } from "@/components/jobs-table";
 import { SectionCard } from "@/components/section-card";
 import { SummaryCard } from "@/components/summary-card";
-import { type JobListItem, type PaginationMeta } from "@/lib/api";
+import { getApiBaseUrl, type JobListItem, type PaginationMeta } from "@/lib/api";
 import {
   getAnalysisSummaryServer,
   getJobsServer,
@@ -66,6 +66,13 @@ export default async function JobsPage({ searchParams }: JobsPageProps) {
           <SummaryCard label="Active" value={jobCounts.pending} />
           <SummaryCard label="Completed" value={jobCounts.completed} />
           <SummaryCard label="Needs attention" value={jobCounts.failed} />
+        </div>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Button asChild variant="secondary">
+            <a href={`${getApiBaseUrl()}/jobs/export/transactions.csv`}>
+              Export all jobs CSV
+            </a>
+          </Button>
         </div>
       </SectionCard>
 

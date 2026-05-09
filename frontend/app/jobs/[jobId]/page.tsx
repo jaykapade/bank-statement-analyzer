@@ -146,6 +146,11 @@ export default async function JobDetailPage({
                 <Button asChild>
                   <Link href={`/jobs/${jobId}/transactions`}>Open dedicated table</Link>
                 </Button>
+                <Button asChild variant="secondary">
+                  <a href={`${getApiBaseUrl()}/jobs/${jobId}/export/transactions.csv`}>
+                    Export this job CSV
+                  </a>
+                </Button>
                 {canRetry ? <RetryCategorizationButton jobId={jobId} /> : null}
                 <Button asChild variant="secondary">
                   <Link href="/jobs">Back to jobs</Link>
@@ -166,6 +171,16 @@ export default async function JobDetailPage({
               value={job?.transaction_summary.count ?? transactions.length}
             />
             <SummaryCard
+              label="Income total"
+              value={formatAmount(job?.transaction_summary.total_income ?? 0)}
+              valueClassName="text-[clamp(1.5rem,2.2vw,2rem)]"
+            />
+            <SummaryCard
+              label="Expense total"
+              value={formatAmount(job?.transaction_summary.total_expenses ?? 0)}
+              valueClassName="text-[clamp(1.5rem,2.2vw,2rem)]"
+            />
+            <SummaryCard
               label="Net flow"
               value={formatAmount(job?.transaction_summary.net_flow ?? 0)}
               valueClassName="text-[clamp(1.5rem,2.2vw,2rem)]"
@@ -182,6 +197,22 @@ export default async function JobDetailPage({
         markdownPreviewUrl={markdownPreviewUrl}
         pdfPreviewUrl={pdfPreviewUrl}
       />
+
+      {job?.summary_brief ? (
+        <SectionCard
+          title="Brief analysis"
+          body="Auto-generated snapshot after categorization."
+        >
+            <Card className="rounded-[1.25rem] bg-white/4">
+              <CardContent className="p-5 text-sm leading-7 text-[var(--color-mist)] whitespace-pre-line">
+                {job.summary_brief}
+                <p className="mt-3 text-xs uppercase tracking-[0.2em] text-[var(--color-mist-strong)]">
+                  Generated via {job.summary_brief_source === "rag" ? "RAG" : "rules"}
+                </p>
+              </CardContent>
+            </Card>
+          </SectionCard>
+      ) : null}
 
       <SectionCard
         title="Transaction table"

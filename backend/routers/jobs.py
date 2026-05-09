@@ -1,4 +1,5 @@
 import io
+import csv
 import uuid
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -15,6 +16,7 @@ from logger import logger
 from models import CategoryStatus, Job, JobStatus, Transaction, User
 from redis import Redis
 from rq import Queue
+from services.job_summary import recompute_job_summary
 from storage import get_markdown_object_key, s3
 from tasks import retry_categorization
 
@@ -213,42 +215,13 @@ def get_job_status(job_id: str, current_user: User = Depends(get_current_user)):
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
 
-        total = session.query(Transaction).filter(Transaction.job_id == job_id).count()
-
-        done = (
-            session.query(Transaction)
-            .filter(
-                Transaction.job_id == job_id,
-                Transaction.category_status == CategoryStatus.done,
-            )
-            .count()
-        )
-
-        failed = (
-            session.query(Transaction)
-            .filter(
-                Transaction.job_id == job_id,
-                Transaction.category_status == CategoryStatus.failed,
-            )
-            .count()
-        )
-
-        pending = (
-            session.query(Transaction)
-            .filter(
-                Transaction.job_id == job_id,
-                Transaction.category_status == CategoryStatus.pending,
-            )
-            .count()
-        )
-
         return {
             "job_id": job_id,
             "status": job.status,
-            "total": total,
-            "done": done,
-            "failed": failed,
-            "pending": pending,
+            "total": job.summary_transaction_count,
+            "done": job.summary_done_count,
+            "failed": job.summary_failed_count,
+            "pending": job.summary_pending_count,
         }
     finally:
         session.close()
@@ -431,6 +404,7 @@ def create_transaction(
             category_status=payload.category_status,
         )
         session.add(transaction)
+        recompute_job_summary(session, job_id)
         session.commit()
         invalidate_user_cache(current_user.id)
         invalidate_job_summary_cache(job_id)
@@ -466,6 +440,7 @@ def update_transaction(
         for key, value in updates.items():
             setattr(transaction, key, value)
 
+        recompute_job_summary(session, job_id)
         session.commit()
         invalidate_user_cache(current_user.id)
         invalidate_job_summary_cache(job_id)
@@ -494,6 +469,7 @@ def delete_transaction(
             session, job_id, transaction_id, current_user.id
         )
         session.delete(transaction)
+        recompute_job_summary(session, job_id)
         session.commit()
         invalidate_user_cache(current_user.id)
         invalidate_job_summary_cache(job_id)
@@ -609,3 +585,106 @@ def preview_job_markdown(job_id: str, current_user: User = Depends(get_current_u
         )
     finally:
         session.close()
+
+
+@router.get("/jobs/{job_id}/export/transactions.csv")
+def export_job_transactions_csv(
+    job_id: str, current_user: User = Depends(get_current_user)
+):
+    session = SessionLocal()
+    try:
+        job = get_owned_job_or_404(session, job_id, current_user.id)
+        rows = (
+            session.query(Transaction)
+            .filter(Transaction.job_id == job_id)
+            .order_by(Transaction.date.asc(), Transaction.created_at.asc())
+            .all()
+        )
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(
+            [
+                "job_id",
+                "filename",
+                "date",
+                "description",
+                "amount",
+                "category",
+                "category_status",
+                "transaction_id",
+            ]
+        )
+        for t in rows:
+            writer.writerow(
+                [
+                    job.job_id,
+                    job.filename or "",
+                    t.date or "",
+                    t.description or "",
+                    str(t.amount) if t.amount is not None else "",
+                    t.category or "",
+                    t.category_status or "",
+                    t.id,
+                ]
+            )
+
+        data = output.getvalue().encode("utf-8")
+        headers = {
+            "Content-Disposition": f'attachment; filename="transactions-{job_id}.csv"',
+            "Cache-Control": "no-store",
+        }
+        return Response(content=data, media_type="text/csv; charset=utf-8", headers=headers)
+    finally:
+        session.close()
+
+
+@router.get("/jobs/export/transactions.csv")
+def export_all_transactions_csv(current_user: User = Depends(get_current_user)):
+    session = SessionLocal()
+    try:
+        rows = (
+            session.query(Transaction, Job)
+            .join(Job, Job.job_id == Transaction.job_id)
+            .filter(Job.user_id == current_user.id)
+            .order_by(Job.created_at.desc(), Transaction.date.asc(), Transaction.created_at.asc())
+            .all()
+        )
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(
+            [
+                "job_id",
+                "filename",
+                "date",
+                "description",
+                "amount",
+                "category",
+                "category_status",
+                "transaction_id",
+            ]
+        )
+        for txn, job in rows:
+            writer.writerow(
+                [
+                    job.job_id,
+                    job.filename or "",
+                    txn.date or "",
+                    txn.description or "",
+                    str(txn.amount) if txn.amount is not None else "",
+                    txn.category or "",
+                    txn.category_status or "",
+                    txn.id,
+                ]
+            )
+
+        data = output.getvalue().encode("utf-8")
+        headers = {
+            "Content-Disposition": 'attachment; filename="transactions-all-jobs.csv"',
+            "Cache-Control": "no-store",
+        }
+        return Response(content=data, media_type="text/csv; charset=utf-8", headers=headers)
+    finally:
+        session.close()
+
