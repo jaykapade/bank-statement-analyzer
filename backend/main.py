@@ -27,6 +27,7 @@ from storage import init_bucket
 from routers.admin import router as admin_router
 from routers.analysis import router as analysis_router
 from routers.auth import router as auth_router
+from routers.chat import router as chat_router
 from routers.jobs import router as jobs_router
 from routers.upload import router as upload_router
 
@@ -58,6 +59,7 @@ app.include_router(jobs_router)
 app.include_router(upload_router)
 app.include_router(admin_router)
 app.include_router(analysis_router)
+app.include_router(chat_router)
 
 
 # ── Exception handlers ────────────────────────────────────────────────────────

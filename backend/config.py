@@ -81,6 +81,22 @@ class Settings(BaseSettings):
     # Retry attempts on empty/unparseable LLM output
     llm_retry_attempts: int = 2
 
+    # ── Embeddings (Ollama nomic-embed-text) ──────────────────────────────────
+    # Separate endpoint for the /api/embeddings route (different from /api/generate)
+    ollama_embed_url: str = "http://localhost:11434/api/embeddings"
+    ollama_embed_model: str = "nomic-embed-text"
+
+    # ── ChromaDB (HTTP client — dedicated Docker service) ─────────────────────
+    # In Docker: CHROMA_HOST=chromadb, CHROMA_PORT=8000
+    # Local dev:  docker compose up chromadb  →  localhost:8001
+    chroma_host: str = "localhost"
+    chroma_port: int = 8001
+    chroma_collection: str = "transactions"
+
+    # ── Chat / RAG ────────────────────────────────────────────────────────────
+    # Number of semantically similar transactions to inject as context per question
+    chat_top_k: int = 20
+
     # ── Analysis Cache ───────────────────────────────────────────────────────
     # TTL (seconds) for user-level aggregation endpoints (summary, trend, categories).
     # These are invalidated immediately when a job completes, so 5 min is fine.

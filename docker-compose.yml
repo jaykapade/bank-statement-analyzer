@@ -29,6 +29,16 @@ services:
     volumes:
       - minio_data:/data
 
+  chromadb:
+    image: chromadb/chroma:latest
+    ports:
+      - "8001:8000"  # exposed on 8001 so it doesn't clash with the backend
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+
   backend:
     build: ./backend
     command: sh -c "alembic upgrade head && fastapi dev main.py --host 0.0.0.0 --port 8000"
@@ -40,6 +50,7 @@ services:
       - redis
       - minio
       - postgres
+      - chromadb
     environment:
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/finance
       - REDIS_HOST=redis
@@ -47,6 +58,9 @@ services:
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin
       - OLLAMA_URL=http://host.docker.internal:11434/api/generate
+      - OLLAMA_EMBED_URL=http://host.docker.internal:11434/api/embeddings
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
 
   worker:
     build: ./backend
@@ -57,6 +71,7 @@ services:
       - redis
       - minio
       - postgres
+      - chromadb
     environment:
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/finance
       - REDIS_HOST=redis
@@ -64,6 +79,9 @@ services:
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin
       - OLLAMA_URL=http://host.docker.internal:11434/api/generate
+      - OLLAMA_EMBED_URL=http://host.docker.internal:11434/api/embeddings
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
 
   frontend:
     build: ./frontend
@@ -78,3 +96,4 @@ services:
 volumes:
   minio_data:
   postgres_data:
+  chroma_data:

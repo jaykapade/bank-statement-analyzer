@@ -179,7 +179,7 @@ def process_pdf(object_key: str, job_id: str):
                 "id": str(t.id),
                 "date": str(t.date),
                 "description": t.description,
-                "amount": t.amount,
+                "amount": float(t.amount),  # Decimal → float for json.dumps()
             }
             for t in saved_rows
         ]
@@ -237,6 +237,39 @@ def process_pdf(object_key: str, job_id: str):
 
         if job_row:
             invalidate_user_cache(job_row.user_id)
+
+        # STEP 7: Embed completed transactions into ChromaDB for RAG chatbot
+        # Non-fatal — if Ollama's embed model isn't loaded, the job still
+        # completes; users just can't query this job via /chat until re-embedded.
+        try:
+            from services.embeddings import upsert_transactions as _upsert
+            embed_rows = (
+                session.query(Transaction)
+                .filter(Transaction.job_id == job_id)
+                .all()
+            )
+            txn_dicts = [
+                {
+                    "id": t.id,
+                    "job_id": job_id,
+                    "date": str(t.date),
+                    "description": t.description,
+                    "amount": float(t.amount),
+                    "category": t.category or "Uncategorized",
+                }
+                for t in embed_rows
+            ]
+            _upsert(txn_dicts, user_id=job_row.user_id)
+            logger.info(
+                f"[Worker] Embedded {len(txn_dicts)} transactions "
+                f"for job {job_id}"
+            )
+        except Exception as embed_err:
+            logger.warning(
+                f"[Worker] Embedding step failed (non-fatal) for job {job_id}: "
+                f"{embed_err}"
+            )
+
         logger.info(f"[Worker] Completed {job_id}")
 
     except Exception as e:
@@ -307,7 +340,7 @@ def retry_categorization(job_id: str):
                 "id": str(t.id),
                 "date": str(t.date),
                 "description": t.description,
-                "amount": t.amount,
+                "amount": float(t.amount),  # Decimal → float for json.dumps()
             }
             for t in rows
         ]
@@ -362,6 +395,37 @@ def retry_categorization(job_id: str):
 
         if job_row:
             invalidate_user_cache(job_row.user_id)
+
+        # Embed completed transactions into ChromaDB (non-fatal)
+        try:
+            from services.embeddings import upsert_transactions as _upsert
+            embed_rows = (
+                session.query(Transaction)
+                .filter(Transaction.job_id == job_id)
+                .all()
+            )
+            txn_dicts = [
+                {
+                    "id": t.id,
+                    "job_id": job_id,
+                    "date": str(t.date),
+                    "description": t.description,
+                    "amount": float(t.amount),
+                    "category": t.category or "Uncategorized",
+                }
+                for t in embed_rows
+            ]
+            _upsert(txn_dicts, user_id=job_row.user_id)
+            logger.info(
+                f"[Worker] Retry: embedded {len(txn_dicts)} transactions "
+                f"for job {job_id}"
+            )
+        except Exception as embed_err:
+            logger.warning(
+                f"[Worker] Retry embedding step failed (non-fatal) for job "
+                f"{job_id}: {embed_err}"
+            )
+
         logger.info(f"[Worker] Retry completed for {job_id}")
 
     except Exception as e:

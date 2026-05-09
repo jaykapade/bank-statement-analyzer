@@ -9,6 +9,7 @@ import { LogoutButton } from "@/components/logout-button";
 import { ResetButton } from "@/components/reset-button";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ChatPanel } from "@/components/chat-panel";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -36,7 +37,7 @@ export function AppShell({
   const activeItem =
     navItems.find((item) => isActive(pathname, item.href)) ?? navItems[0];
 
-  if (!user && isAuthRoute) {
+  if (isAuthRoute) {
     return (
       <div className="dashboard-grid min-h-screen">
         <main className="mx-auto flex min-h-screen w-full max-w-6xl items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
@@ -152,6 +153,7 @@ export function AppShell({
           <main className="flex-1">{children}</main>
         </div>
       </div>
+      {user && <ChatPanel />}
     </div>
   );
 }
