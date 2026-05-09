@@ -147,7 +147,11 @@ export default async function JobDetailPage({
                   <Link href={`/jobs/${jobId}/transactions`}>Open dedicated table</Link>
                 </Button>
                 <Button asChild variant="secondary">
-                  <a href={`${getApiBaseUrl()}/jobs/${jobId}/export/transactions.csv`}>
+                  <a
+                    href={`${getApiBaseUrl()}/jobs/${jobId}/export/transactions.csv`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     Export this job CSV
                   </a>
                 </Button>

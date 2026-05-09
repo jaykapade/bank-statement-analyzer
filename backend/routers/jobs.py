@@ -1,6 +1,7 @@
 import io
 import csv
 import uuid
+from typing import Optional, Iterable
 from decimal import Decimal, ROUND_HALF_UP
 
 from botocore.exceptions import ClientError
@@ -130,6 +131,25 @@ def ensure_markdown_bytes(job: Job) -> bytes:
 
     markdown_key = get_markdown_object_key(job.s3_url)
     return read_s3_bytes_or_404(markdown_key)
+
+
+def sanitize_csv_cell(value: Optional[str]) -> str:
+    if value is None:
+        return ""
+    text = str(value)
+    if text.startswith(("=", "+", "-", "@", "\t", "\r", "'")):
+        return f"'{text}"
+    return text
+
+
+def _csv_stream(rows: Iterable[list[str]]):
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    for row in rows:
+        writer.writerow(row)
+        yield buffer.getvalue()
+        buffer.seek(0)
+        buffer.truncate(0)
 
 
 # ---------------------------------------------------------------------------
@@ -291,11 +311,10 @@ def delete_job(job_id: str, current_user: User = Depends(get_current_user)):
     # Best effort cleanup for ChromaDB vectors
     try:
         from services.embeddings import delete_job_transactions as _delete_vecs
+
         _delete_vecs(job_id)
     except Exception as exc:
-        logger.warning(
-            f"Failed to delete ChromaDB vectors for job {job_id}: {exc}"
-        )
+        logger.warning(f"Failed to delete ChromaDB vectors for job {job_id}: {exc}")
 
     return {
         "message": "Job deleted",
@@ -592,19 +611,11 @@ def export_job_transactions_csv(
     job_id: str, current_user: User = Depends(get_current_user)
 ):
     session = SessionLocal()
-    try:
-        job = get_owned_job_or_404(session, job_id, current_user.id)
-        rows = (
-            session.query(Transaction)
-            .filter(Transaction.job_id == job_id)
-            .order_by(Transaction.date.asc(), Transaction.created_at.asc())
-            .all()
-        )
+    job = get_owned_job_or_404(session, job_id, current_user.id)
 
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow(
-            [
+    def row_iter():
+        try:
+            yield [
                 "job_id",
                 "filename",
                 "date",
@@ -614,47 +625,49 @@ def export_job_transactions_csv(
                 "category_status",
                 "transaction_id",
             ]
-        )
-        for t in rows:
-            writer.writerow(
-                [
-                    job.job_id,
-                    job.filename or "",
-                    t.date or "",
-                    t.description or "",
-                    str(t.amount) if t.amount is not None else "",
-                    t.category or "",
-                    t.category_status or "",
-                    t.id,
-                ]
+            query = (
+                session.query(Transaction)
+                .filter(Transaction.job_id == job_id)
+                .order_by(Transaction.date.asc(), Transaction.created_at.asc())
+                .yield_per(500)
             )
+            for t in query:
+                category_status = (
+                    ""
+                    if t.category_status is None
+                    else getattr(t.category_status, "value", str(t.category_status))
+                )
+                yield [
+                    sanitize_csv_cell(job.job_id),
+                    sanitize_csv_cell(job.filename),
+                    sanitize_csv_cell(t.date),
+                    sanitize_csv_cell(t.description),
+                    sanitize_csv_cell(str(t.amount) if t.amount is not None else ""),
+                    sanitize_csv_cell(t.category),
+                    sanitize_csv_cell(category_status),
+                    sanitize_csv_cell(t.id),
+                ]
+        finally:
+            session.close()
 
-        data = output.getvalue().encode("utf-8")
-        headers = {
-            "Content-Disposition": f'attachment; filename="transactions-{job_id}.csv"',
-            "Cache-Control": "no-store",
-        }
-        return Response(content=data, media_type="text/csv; charset=utf-8", headers=headers)
-    finally:
-        session.close()
+    headers = {
+        "Content-Disposition": f'attachment; filename="transactions-{job_id}.csv"',
+        "Cache-Control": "no-store",
+    }
+    return StreamingResponse(
+        _csv_stream(row_iter()),
+        media_type="text/csv; charset=utf-8",
+        headers=headers,
+    )
 
 
 @router.get("/jobs/export/transactions.csv")
 def export_all_transactions_csv(current_user: User = Depends(get_current_user)):
     session = SessionLocal()
-    try:
-        rows = (
-            session.query(Transaction, Job)
-            .join(Job, Job.job_id == Transaction.job_id)
-            .filter(Job.user_id == current_user.id)
-            .order_by(Job.created_at.desc(), Transaction.date.asc(), Transaction.created_at.asc())
-            .all()
-        )
 
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow(
-            [
+    def row_iter():
+        try:
+            yield [
                 "job_id",
                 "filename",
                 "date",
@@ -664,27 +677,44 @@ def export_all_transactions_csv(current_user: User = Depends(get_current_user)):
                 "category_status",
                 "transaction_id",
             ]
-        )
-        for txn, job in rows:
-            writer.writerow(
-                [
-                    job.job_id,
-                    job.filename or "",
-                    txn.date or "",
-                    txn.description or "",
-                    str(txn.amount) if txn.amount is not None else "",
-                    txn.category or "",
-                    txn.category_status or "",
-                    txn.id,
-                ]
+            query = (
+                session.query(Transaction, Job)
+                .join(Job, Job.job_id == Transaction.job_id)
+                .filter(Job.user_id == current_user.id)
+                .order_by(
+                    Job.created_at.desc(),
+                    Transaction.date.asc(),
+                    Transaction.created_at.asc(),
+                )
+                .yield_per(500)
             )
+            for txn, job in query:
+                category_status = (
+                    ""
+                    if txn.category_status is None
+                    else getattr(txn.category_status, "value", str(txn.category_status))
+                )
+                yield [
+                    sanitize_csv_cell(job.job_id),
+                    sanitize_csv_cell(job.filename),
+                    sanitize_csv_cell(txn.date),
+                    sanitize_csv_cell(txn.description),
+                    sanitize_csv_cell(
+                        str(txn.amount) if txn.amount is not None else ""
+                    ),
+                    sanitize_csv_cell(txn.category),
+                    sanitize_csv_cell(category_status),
+                    sanitize_csv_cell(txn.id),
+                ]
+        finally:
+            session.close()
 
-        data = output.getvalue().encode("utf-8")
-        headers = {
-            "Content-Disposition": 'attachment; filename="transactions-all-jobs.csv"',
-            "Cache-Control": "no-store",
-        }
-        return Response(content=data, media_type="text/csv; charset=utf-8", headers=headers)
-    finally:
-        session.close()
-
+    headers = {
+        "Content-Disposition": 'attachment; filename="transactions-all-jobs.csv"',
+        "Cache-Control": "no-store",
+    }
+    return StreamingResponse(
+        _csv_stream(row_iter()),
+        media_type="text/csv; charset=utf-8",
+        headers=headers,
+    )

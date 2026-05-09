@@ -125,6 +125,8 @@ export function AppShell({
                   >
                     <a
                       href={`${getApiBaseUrl()}/jobs/export/transactions.csv`}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="bg-[length:400%_400%] animate-gradient-shift"
                       style={{
                         backgroundImage:

@@ -69,7 +69,11 @@ export default async function JobsPage({ searchParams }: JobsPageProps) {
         </div>
         <div className="mt-5 flex flex-wrap gap-3">
           <Button asChild variant="secondary">
-            <a href={`${getApiBaseUrl()}/jobs/export/transactions.csv`}>
+            <a
+              href={`${getApiBaseUrl()}/jobs/export/transactions.csv`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               Export all jobs CSV
             </a>
           </Button>

@@ -1,5 +1,6 @@
 import re
 import json
+import httpx
 from decimal import Decimal
 
 from logger import logger
@@ -39,9 +40,13 @@ def _format_structured_brief(parts: dict) -> str | None:
         return None
     parts_out: list[str] = []
     parts_out.append(ch or "No strong category trend was identified in this statement.")
-    parts_out.append(good or "Overall this statement looks stable based on available rows.")
+    parts_out.append(
+        good or "Overall this statement looks stable based on available rows."
+    )
     parts_out.append(watch or "No major risk flags were detected in this statement.")
-    parts_out.append(improve or "Continue tracking month over month to improve planning confidence.")
+    parts_out.append(
+        improve or "Continue tracking month over month to improve planning confidence."
+    )
     return " ".join(parts_out)
 
 
@@ -83,8 +88,8 @@ def generate_job_brief_rag(
     for i, hit in enumerate(hits[:12], 1):
         meta = hit.get("metadata", {})
         context_lines.append(
-            f"{i}. {hit.get('document', '')} | date={meta.get('date','')} | "
-            f"category={meta.get('category','')} | amount={meta.get('amount','')}"
+            f"{i}. {hit.get('document', '')} | date={meta.get('date', '')} | "
+            f"category={meta.get('category', '')} | amount={meta.get('amount', '')}"
         )
     context = "\n".join(context_lines)
 
@@ -131,6 +136,17 @@ Representative transactions:
             f"{answer} Review high-value debits and any unclear merchant labels. "
             "Improving category clarity over time will make trend tracking more reliable."
         )
+    except httpx.TimeoutException as exc:
+        logger.warning(f"[Brief-RAG] Ollama timeout for job {job_id}: {exc}")
+        return None
+    except httpx.HTTPError as exc:
+        logger.warning(f"[Brief-RAG] Ollama HTTP error for job {job_id}: {exc}")
+        return None
+    except json.JSONDecodeError as exc:
+        logger.warning(f"[Brief-RAG] JSON parse failed for job {job_id}: {exc}")
+        return None
     except Exception as exc:
-        logger.warning(f"[Brief-RAG] LLM generation failed for job {job_id}: {exc}")
+        logger.warning(
+            f"[Brief-RAG] Unexpected brief generation error for job {job_id}: {exc}"
+        )
         return None

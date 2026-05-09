@@ -130,7 +130,7 @@ a {
   pointer-events: none;
 }
 
-@keyframes gradientShift {
+@keyframes gradient-shift {
   0% {
     background-position: 0% 50%;
   }
@@ -144,5 +144,12 @@ a {
 
 .animate-gradient-shift {
   background-position: 0% 50%;
-  animation: gradientShift 5s ease infinite;
+  animation: gradient-shift 5s ease infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-gradient-shift {
+    animation: none;
+    background-position: 50% 50%;
+  }
 }
