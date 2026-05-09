@@ -8,6 +8,11 @@ export const metadata: Metadata = {
   title: "Finance Tracker",
   description:
     "A premium financial dashboard for uploads, job tracking, and transaction review.",
+  icons: {
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/favicon.ico",
+  },
 };
 
 export default async function RootLayout({

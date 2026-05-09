@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 
 from auth import get_current_user, get_db
 from cache import TTL_ANALYSIS, TTL_JOB_SUMMARY, get_cached, set_cached
-from models import CategoryStatus, Job, JobStatus, Transaction, User
+from models import Job, JobStatus, Transaction, User
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 ZERO = Decimal("0")
@@ -324,29 +324,12 @@ def analysis_job_summary(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    # Category status counts
-    status_rows = (
-        db.query(Transaction.category_status, func.count(Transaction.id).label("cnt"))
-        .filter(Transaction.job_id == job_id)
-        .group_by(Transaction.category_status)
-        .all()
-    )
-    cnt: dict[str, int] = {r.category_status: r.cnt for r in status_rows}
-
     category_counts = {
-        "total": sum(cnt.values()),
-        "done": cnt.get(CategoryStatus.done, 0),
-        "pending": cnt.get(CategoryStatus.pending, 0),
-        "failed": cnt.get(CategoryStatus.failed, 0),
+        "total": job.summary_transaction_count,
+        "done": job.summary_done_count,
+        "pending": job.summary_pending_count,
+        "failed": job.summary_failed_count,
     }
-
-    # Transaction financial totals
-    transactions = (
-        db.query(Transaction.amount).filter(Transaction.job_id == job_id).all()
-    )
-    amounts = [r.amount for r in transactions]
-    total_income = sum((a for a in amounts if a > 0), start=ZERO)
-    total_expenses = sum((abs(a) for a in amounts if a < 0), start=ZERO)
 
     # Embed user_id in the stored payload for ownership check on cache hit
     result_with_uid = {
@@ -355,11 +338,18 @@ def analysis_job_summary(
         "status": job.status,
         "filename": job.filename,
         "category_counts": category_counts,
+        "summary_brief": job.summary_brief,
+        "summary_brief_source": job.summary_brief_source,
         "transaction_summary": {
-            "count": len(amounts),
-            "total_income": money(total_income),
-            "total_expenses": money(total_expenses),
-            "net_flow": money(total_income - total_expenses),
+            "count": job.summary_transaction_count,
+            "total_income": money(job.summary_income_total or ZERO),
+            "total_expenses": money(job.summary_expense_total or ZERO),
+            "net_flow": money(job.summary_net_total or ZERO),
+            "last_computed_at": (
+                job.summary_last_computed_at.isoformat()
+                if job.summary_last_computed_at
+                else None
+            ),
         },
     }
 

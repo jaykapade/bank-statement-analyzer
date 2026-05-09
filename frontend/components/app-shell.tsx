@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { Clock3, Command, LayoutDashboard, Upload } from "lucide-react";
-import type { AuthUser } from "@/lib/api";
+import { Clock3, Command, Download, LayoutDashboard, Upload } from "lucide-react";
+import { getApiBaseUrl, type AuthUser } from "@/lib/api";
 import { LogoutButton } from "@/components/logout-button";
 import { ResetButton } from "@/components/reset-button";
 import { Button } from "@/components/ui/button";
@@ -118,6 +118,23 @@ export function AppShell({
 
               {user && (
                 <div className="mb-4">
+                  <Button
+                    asChild
+                    className="mb-3 w-full border border-white/20 text-white shadow-[0_10px_25px_rgba(24,95,165,0.28)] hover:brightness-110"
+                    variant="secondary"
+                  >
+                    <a
+                      href={`${getApiBaseUrl()}/jobs/export/transactions.csv`}
+                      className="bg-[length:400%_400%] animate-gradient-shift"
+                      style={{
+                        backgroundImage:
+                          "linear-gradient(270deg, #1D9E75, #185FA5, #D85A30, #993556, #7F77DD, #185FA5)",
+                      }}
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      Export All Transactions
+                    </a>
+                  </Button>
                   <ResetButton />
                 </div>
               )}

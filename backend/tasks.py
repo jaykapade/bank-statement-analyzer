@@ -1,6 +1,6 @@
 from db import SessionLocal
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from logger import setup_logger
 from models import Job, Transaction, CategoryStatus, JobStatus
 from services.llm import extract_transactions, categorize_transactions
@@ -10,7 +10,8 @@ import tempfile
 import os
 from storage import s3, get_markdown_object_key
 from config import settings
-from cache import invalidate_user_cache
+from cache import invalidate_job_summary_cache, invalidate_user_cache
+from services.job_summary import recompute_job_summary
 
 logger = setup_logger("worker")
 
@@ -41,6 +42,7 @@ def save_transactions(session, job_id, transactions):
             description=t["description"],
             amount=t["amount"],
             category=None,
+            category_status=CategoryStatus.pending,
         )
         session.add(txn)
 
@@ -67,9 +69,12 @@ def update_categories(session, job_id, categorized):
             .filter(
                 Transaction.id == txn_id,
                 Transaction.job_id == job_id,
-                Transaction.category_status.in_(
-                    [CategoryStatus.pending, CategoryStatus.failed]
-                ),
+                (
+                    Transaction.category_status.in_(
+                        [CategoryStatus.pending, CategoryStatus.failed]
+                    )
+                )
+                | (Transaction.category_status.is_(None)),
             )
             .update(
                 {
@@ -87,7 +92,8 @@ def update_categories(session, job_id, categorized):
     # STEP 2: mark remaining as failed
     session.query(Transaction).filter(
         Transaction.job_id == job_id,
-        Transaction.category_status == CategoryStatus.pending,
+        (Transaction.category_status == CategoryStatus.pending)
+        | (Transaction.category_status.is_(None)),
     ).update(
         {
             "category_status": CategoryStatus.failed,
@@ -162,6 +168,7 @@ def process_pdf(object_key: str, job_id: str):
         if not get_job_or_none(session, job_id, "process_pdf"):
             return
         save_transactions(session, job_id, transactions)
+        recompute_job_summary(session, job_id)
 
         # ✅ move to categorizing stage
         if not get_job_or_none(session, job_id, "process_pdf"):
@@ -211,6 +218,7 @@ def process_pdf(object_key: str, job_id: str):
 
         # STEP 5: Update Categories (merge rule results + LLM results)
         update_categories(session, job_id, rule_results + categorized)
+        recompute_job_summary(session, job_id)
 
         # STEP 6: Check if any failed remain
         remaining_failed = (
@@ -234,6 +242,7 @@ def process_pdf(object_key: str, job_id: str):
             update_job_status(session, job_id, "completed")
 
         session.commit()
+        invalidate_job_summary_cache(job_id)
 
         if job_row:
             invalidate_user_cache(job_row.user_id)
@@ -269,6 +278,10 @@ def process_pdf(object_key: str, job_id: str):
                 f"[Worker] Embedding step failed (non-fatal) for job {job_id}: "
                 f"{embed_err}"
             )
+        finally:
+            recompute_job_summary(session, job_id, include_rag_brief=True)
+            session.commit()
+            invalidate_job_summary_cache(job_id)
 
         logger.info(f"[Worker] Completed {job_id}")
 
@@ -368,6 +381,7 @@ def retry_categorization(job_id: str):
 
         # STEP 4: Update categories (merge rule results + LLM results)
         update_categories(session, job_id, rule_results + categorized)
+        recompute_job_summary(session, job_id)
 
         # STEP 5: check remaining failures
         remaining_failed = (
@@ -392,6 +406,7 @@ def retry_categorization(job_id: str):
             update_job_status(session, job_id, "completed")
 
         session.commit()
+        invalidate_job_summary_cache(job_id)
 
         if job_row:
             invalidate_user_cache(job_row.user_id)
@@ -425,6 +440,10 @@ def retry_categorization(job_id: str):
                 f"[Worker] Retry embedding step failed (non-fatal) for job "
                 f"{job_id}: {embed_err}"
             )
+        finally:
+            recompute_job_summary(session, job_id, include_rag_brief=True)
+            session.commit()
+            invalidate_job_summary_cache(job_id)
 
         logger.info(f"[Worker] Retry completed for {job_id}")
 
@@ -446,3 +465,76 @@ def retry_categorization(job_id: str):
 
     finally:
         session.close()
+
+
+def garbage_collect_s3_orphans(
+    dry_run: bool = True,
+    min_age_hours: int = 24,
+) -> dict:
+    """
+    Delete S3 PDF/markdown artifacts that are no longer referenced by any Job.
+
+    Safety:
+    - dry_run defaults to True.
+    - only keys older than min_age_hours are considered.
+    - only *.pdf and *.pdf.md objects are eligible for deletion.
+    """
+    session = SessionLocal()
+    try:
+        jobs = session.query(Job).all()
+        referenced_keys: set[str] = set()
+        for job in jobs:
+            if job.s3_url:
+                referenced_keys.add(job.s3_url)
+                referenced_keys.add(get_markdown_object_key(job.s3_url))
+    finally:
+        session.close()
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=max(min_age_hours, 0))
+    checked = 0
+    candidates = 0
+    deleted = 0
+    skipped_not_old_enough = 0
+
+    paginator = s3.get_paginator("list_objects_v2")
+    pages = paginator.paginate(Bucket=settings.bucket_name)
+    for page in pages:
+        for obj in page.get("Contents", []):
+            key = obj.get("Key")
+            if not key:
+                continue
+
+            checked += 1
+            if key in referenced_keys:
+                continue
+
+            if not (key.endswith(".pdf") or key.endswith(".pdf.md")):
+                continue
+
+            last_modified = obj.get("LastModified")
+            if last_modified and last_modified > cutoff:
+                skipped_not_old_enough += 1
+                continue
+
+            candidates += 1
+            if dry_run:
+                logger.info(f"[S3-GC] Dry run candidate: {key}")
+                continue
+
+            try:
+                s3.delete_object(Bucket=settings.bucket_name, Key=key)
+                deleted += 1
+                logger.info(f"[S3-GC] Deleted orphan object: {key}")
+            except Exception as exc:
+                logger.warning(f"[S3-GC] Failed deleting {key}: {exc}")
+
+    result = {
+        "dry_run": dry_run,
+        "min_age_hours": min_age_hours,
+        "checked": checked,
+        "candidates": candidates,
+        "deleted": deleted,
+        "skipped_not_old_enough": skipped_not_old_enough,
+    }
+    logger.info(f"[S3-GC] Completed: {result}")
+    return result

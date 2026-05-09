@@ -96,6 +96,8 @@ export type JobAnalysisSummary = {
   job_id: string;
   status: JobStatus;
   filename: string | null;
+  summary_brief?: string | null;
+  summary_brief_source?: "rules" | "rag" | null;
   category_counts: {
     total: number;
     done: number;
@@ -107,6 +109,7 @@ export type JobAnalysisSummary = {
     total_income: number;
     total_expenses: number;
     net_flow: number;
+    last_computed_at: string | null;
   };
 };
 

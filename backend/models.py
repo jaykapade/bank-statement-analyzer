@@ -3,6 +3,7 @@ from sqlalchemy import (
     String,
     Enum,
     Numeric,
+    Integer,
     ForeignKey,
     DateTime,
     MetaData,
@@ -69,6 +70,16 @@ class Job(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+    summary_transaction_count = Column(Integer, nullable=False, default=0)
+    summary_income_total = Column(Numeric(18, 2), nullable=False, default=0)
+    summary_expense_total = Column(Numeric(18, 2), nullable=False, default=0)
+    summary_net_total = Column(Numeric(18, 2), nullable=False, default=0)
+    summary_done_count = Column(Integer, nullable=False, default=0)
+    summary_pending_count = Column(Integer, nullable=False, default=0)
+    summary_failed_count = Column(Integer, nullable=False, default=0)
+    summary_brief = Column(String, nullable=True)
+    summary_brief_source = Column(String, nullable=True)
+    summary_last_computed_at = Column(DateTime, nullable=True)
 
 
 # -----------------------------
