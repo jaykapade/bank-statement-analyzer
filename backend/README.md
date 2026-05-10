@@ -164,7 +164,9 @@ backend/
 - [x] **S3 Garbage Collection:** Cron-friendly runner (`s3_gc_runner.py`) with dry-run default, age guard, and orphan PDF/markdown cleanup.
 - [x] **Per-Job Bank Statement Summary:** After categorization completes, auto-generates a concise natural-language summary (with RAG support) for each job (total income, top expense categories, notable transactions) and saves it to the job record.
 - [x] **Export to CSV:** `GET /jobs/{job_id}/export/transactions.csv` and `GET /jobs/export/transactions.csv` endpoints that stream a CSV of the user's transactions.
-
+- [x] **Anomaly Detection:** Post-categorization background step that flags suspicious transactions — duplicates (same merchant + amount within N days), statistical outliers per category (Z-score / IQR), and sudden spending spikes — stored as a boolean `is_flagged` + `flag_reason` on the Transaction model.
+- [x] **Spending Forecasting:** `GET /analysis/forecast` endpoint that uses linear regression (or exponential smoothing via `statsmodels`) on historical per-category monthly totals to predict next month's spend per category.
+- [x] **Smart Budget Suggestions:** `GET /analysis/budget-suggestions` endpoint that sends the user's historical spending summary to the LLM and returns structured budget targets per category with justification.
 ---
 
 ## TODOs
@@ -173,7 +175,4 @@ backend/
 
 - [ ] **Error Handling & Validation:** Standardize error responses and add request-level input validation.
 - [ ] **Unit & Integration Tests:** `pytest` coverage for auth flows, job endpoints, and background tasks.
-- [ ] **Anomaly Detection:** Post-categorization background step that flags suspicious transactions — duplicates (same merchant + amount within N days), statistical outliers per category (Z-score / IQR), and sudden spending spikes — stored as a boolean `is_flagged` + `flag_reason` on the Transaction model.
-- [ ] **Spending Forecasting:** `GET /analysis/forecast` endpoint that uses linear regression (or exponential smoothing via `statsmodels`) on historical per-category monthly totals to predict next month's spend per category.
-- [ ] **Smart Budget Suggestions:** `GET /analysis/budget-suggestions` endpoint that sends the user's historical spending summary to the LLM and returns structured budget targets per category with justification.
-- [ ] **Multi-statement Trend Analysis:** `GET /analysis/trend` endpoint that aggregates income, expenses, and savings rate month-by-month across all jobs, enabling cross-statement comparisons.
+
