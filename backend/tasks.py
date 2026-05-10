@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from logger import setup_logger
 from models import Job, Transaction, CategoryStatus, JobStatus
+from models import InsightRun, InsightRunStatus, AnomalyDecision
 from services.llm import extract_transactions, categorize_transactions
 from services.rules import rules_categorize
 from services.pdf import extract_markdown
@@ -12,6 +13,8 @@ from storage import s3, get_markdown_object_key
 from config import settings
 from cache import invalidate_job_summary_cache, invalidate_user_cache
 from services.job_summary import recompute_job_summary
+from services.insights import build_insights_payload
+import json
 
 logger = setup_logger("worker")
 
@@ -549,3 +552,50 @@ def garbage_collect_s3_orphans(
     }
     logger.info(f"[S3-GC] Completed: {result}")
     return result
+
+
+def run_user_insights(insight_run_id: str):
+    session = SessionLocal()
+    try:
+        run = session.query(InsightRun).filter(InsightRun.id == insight_run_id).first()
+        if not run:
+            logger.warning(f"[Insights] Run not found: {insight_run_id}")
+            return
+
+        run.status = InsightRunStatus.running
+        run.started_at = datetime.utcnow()
+        session.commit()
+
+        transactions = (
+            session.query(Transaction)
+            .join(Job, Job.job_id == Transaction.job_id)
+            .filter(Job.user_id == run.user_id)
+            .all()
+        )
+        dismissed = (
+            session.query(AnomalyDecision.transaction_id)
+            .filter(
+                AnomalyDecision.user_id == run.user_id,
+                AnomalyDecision.is_anomaly == 0,
+            )
+            .all()
+        )
+        dismissed_ids = {row.transaction_id for row in dismissed}
+
+        result = build_insights_payload(transactions, dismissed_ids, run.user_id)
+        run.result_json = json.dumps(result)
+        run.status = InsightRunStatus.completed
+        run.completed_at = datetime.utcnow()
+        run.error = None
+        session.commit()
+    except Exception as exc:
+        session.rollback()
+        run = session.query(InsightRun).filter(InsightRun.id == insight_run_id).first()
+        if run:
+            run.status = InsightRunStatus.failed
+            run.error = str(exc)
+            run.completed_at = datetime.utcnow()
+            session.commit()
+        logger.error(f"[Insights] Failed run {insight_run_id}: {exc}", exc_info=True)
+    finally:
+        session.close()

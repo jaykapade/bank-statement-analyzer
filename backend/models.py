@@ -133,3 +133,46 @@ class Session(Base):
     token_hash = Column(String, unique=True, nullable=False, index=True)
     created_at = Column(DateTime, nullable=False)
     expires_at = Column(DateTime, nullable=False, index=True)
+
+
+class InsightRunStatus(str, enum.Enum):
+    pending = "pending"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+
+
+class InsightRun(Base):
+    __tablename__ = "insight_runs"
+
+    id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    status = Column(Enum(InsightRunStatus), nullable=False, default=InsightRunStatus.pending)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    error = Column(String, nullable=True)
+    result_json = Column(String, nullable=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
+class AnomalyDecision(Base):
+    __tablename__ = "anomaly_decisions"
+
+    id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    transaction_id = Column(String, ForeignKey("transactions.id"), nullable=False, index=True)
+    is_anomaly = Column(Integer, nullable=False, default=1)
+    reason = Column(String, nullable=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )

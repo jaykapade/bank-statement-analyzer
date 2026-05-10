@@ -122,6 +122,43 @@ export type AuthResponse = {
   user: AuthUser;
 };
 
+export type InsightAnomaly = {
+  transaction_id: string;
+  date: string;
+  description: string;
+  category: string | null;
+  amount: number;
+  flag_reason: string;
+};
+
+export type InsightRunResult = {
+  generated_at: string;
+  anomalies: InsightAnomaly[];
+  forecast: {
+    next_month_expense_forecast: number;
+    months_used: number;
+  };
+  budget_suggestions: {
+    category: string;
+    current_monthly_average: number;
+    suggested_budget: number;
+  }[];
+  summary: string;
+  recommended_actions: string[];
+};
+
+export type InsightRunEnvelope = {
+  run: {
+    id: string;
+    status: "pending" | "running" | "completed" | "failed";
+    error: string | null;
+    created_at: string | null;
+    started_at: string | null;
+    completed_at: string | null;
+    result: InsightRunResult | null;
+  } | null;
+};
+
 type ApiErrorShape = {
   detail?: string;
 };
@@ -331,4 +368,34 @@ export async function sendChatMessage(message: string): Promise<ChatResponse> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message }),
   });
+}
+
+export async function startInsightsRun() {
+  return apiFetch<{ run_id: string; status: string }>("/insights/run", {
+    method: "POST",
+  });
+}
+
+export async function getLatestInsightsRun() {
+  return apiFetch<InsightRunEnvelope>("/insights/runs/latest");
+}
+
+export async function dismissAnomaly(transactionId: string, reason?: string) {
+  return apiFetch<{ message: string; transaction_id: string }>(
+    `/insights/anomalies/${transactionId}/dismiss`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: reason ?? null }),
+    },
+  );
+}
+
+export async function deleteAnomalyTransaction(transactionId: string) {
+  return apiFetch<{ message: string; transaction_id: string; job_id: string }>(
+    `/insights/anomalies/${transactionId}`,
+    {
+      method: "DELETE",
+    },
+  );
 }
