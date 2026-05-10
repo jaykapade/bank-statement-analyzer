@@ -98,8 +98,9 @@ frontend/
 - [x] **CSV Export:** Download buttons on both the global dashboard and per-job pages to export transactions to CSV.
 - [x] **Per-Job Summary View:** Renders an auto-generated natural-language summary (with RAG support) on the job detail page, alongside key metrics.
 
-### Planned
-- [ ] **Anomaly Detection UI:** Highlight flagged transactions in the transaction table with a warning badge; include a dedicated "Flagged" filter tab and a tooltip showing the flag reason.
-- [ ] **Spending Forecast Dashboard:** New dashboard card showing next month's predicted spend per category as a bar chart, with a confidence indicator.
-- [ ] **Smart Budget Suggestions Panel:** A recommendations panel (sidebar or modal) displaying LLM-generated budget targets per category with accept/dismiss actions.
-- [ ] **Multi-statement Trend Chart:** Line chart on the dashboard showing income, expenses, and savings rate month-by-month across all uploaded statements.
+### Smart Insights (Smart Analytics & Budgeting) ✅
+- [x] **Anomaly Detection UI:** Highlight flagged transactions in the transaction table with a warning badge; include a dedicated "Flagged" filter tab and a tooltip showing the flag reason.
+- [x] **Spending Forecast Dashboard:** New dashboard card showing next month's predicted spend per category as a bar chart, with a confidence indicator.
+- [x] **Smart Budget Suggestions Panel:** A recommendations panel (sidebar or modal) displaying LLM-generated budget targets per category with accept/dismiss actions.
+
+
