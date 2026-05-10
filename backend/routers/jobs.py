@@ -280,10 +280,17 @@ def update_job(
 @router.delete("/jobs/{job_id}")
 def delete_job(job_id: str, current_user: User = Depends(get_current_user)):
     job_s3_url: str | None = None
+    transaction_ids: list[str] = []
     session = SessionLocal()
     try:
         job = get_owned_job_or_404(session, job_id, current_user.id)
         job_s3_url = job.s3_url
+        transaction_ids = [
+            str(txn_id)
+            for (txn_id,) in session.query(Transaction.id)
+            .filter(Transaction.job_id == job_id)
+            .all()
+        ]
 
         deleted_transactions = (
             session.query(Transaction)
@@ -310,9 +317,13 @@ def delete_job(job_id: str, current_user: User = Depends(get_current_user)):
 
     # Best effort cleanup for ChromaDB vectors
     try:
-        from services.embeddings import delete_job_transactions as _delete_vecs
+        from services.embeddings import (
+            delete_job_transactions as _delete_by_job,
+            delete_transaction_embeddings as _delete_by_ids,
+        )
 
-        _delete_vecs(job_id)
+        _delete_by_job(job_id)
+        _delete_by_ids(transaction_ids)
     except Exception as exc:
         logger.warning(f"Failed to delete ChromaDB vectors for job {job_id}: {exc}")
 

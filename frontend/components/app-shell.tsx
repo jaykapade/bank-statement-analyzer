@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { Clock3, Command, Download, LayoutDashboard, Upload } from "lucide-react";
+import { Brain, Clock3, Command, Download, LayoutDashboard, Upload } from "lucide-react";
 import { getApiBaseUrl, type AuthUser } from "@/lib/api";
 import { LogoutButton } from "@/components/logout-button";
 import { ResetButton } from "@/components/reset-button";
@@ -15,6 +15,7 @@ const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/upload", label: "Upload", icon: Upload },
   { href: "/jobs", label: "Jobs", icon: Clock3 },
+  { href: "/insights", label: "Insights", icon: Brain },
 ];
 
 function isActive(pathname: string, href: string) {

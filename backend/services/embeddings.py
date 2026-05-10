@@ -256,6 +256,23 @@ def delete_job_transactions(job_id: str) -> None:
         logger.warning(f"[Embeddings] Failed to delete vectors for job {job_id}: {e}")
 
 
+def delete_transaction_embeddings(transaction_ids: list[str]) -> None:
+    """
+    Remove vectors by explicit Chroma document IDs (transaction IDs).
+    Useful when metadata filters are incomplete for older vectors.
+    """
+    if not transaction_ids:
+        return
+    try:
+        collection = get_chroma_collection()
+        collection.delete(ids=[str(txn_id) for txn_id in transaction_ids])
+        logger.info(
+            f"[Embeddings] Deleted {len(transaction_ids)} vectors by transaction IDs"
+        )
+    except Exception as e:
+        logger.warning(
+            f"[Embeddings] Failed to delete vectors by transaction IDs: {e}"
+        )
 def delete_user_transactions(user_id: str) -> None:
     """
     Remove all ChromaDB vectors belonging to `user_id`.
@@ -269,3 +286,4 @@ def delete_user_transactions(user_id: str) -> None:
         logger.warning(
             f"[Embeddings] Failed to delete vectors for user {user_id}: {e}"
         )
+

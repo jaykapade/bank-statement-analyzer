@@ -10,6 +10,7 @@ import {
   type JobListResponse,
   type SpendingTrendResponse,
   type TransactionsResponse,
+  type InsightRunEnvelope,
 } from "@/lib/api";
 
 export async function serverApiFetch<T>(
@@ -157,4 +158,8 @@ export async function getCategoryBreakdownServer(
 
 export async function getJobAnalysisSummaryServer(jobId: string) {
   return serverApiFetch<JobAnalysisSummary>(`/analysis/jobs/${jobId}/summary`);
+}
+
+export async function getLatestInsightsRunServer() {
+  return serverApiFetch<InsightRunEnvelope>("/insights/runs/latest");
 }
